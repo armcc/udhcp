@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ use /dev/urandom to seed xid's (instead of time(0)) 
 + fixed renew behavior (me)
 + udhcp now fits nicely into busybox
   (Glenn McGrath <bug1@optushome.com.au> as well as myself)
