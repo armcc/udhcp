@@ -3,5 +3,6 @@
 #define _SOCKET_H
 
 int listen_socket(unsigned int ip, int port, char *inf);
+int raw_socket(char *inf);
 
 #endif
