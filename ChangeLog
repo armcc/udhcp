@@ -1,3 +1,8 @@
+0.9.1 (010806)
++ Added udhcpc client
++ reorganized functions/files
++ listening socket now only binds to one interface
+
 0.9.0 (010720) Major rewrite, current changes, goals:
 + should not segfault on bogus packets.
 + Options can be read from sname and file fields.

@@ -5,6 +5,8 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
+#include "leases.h"
+
 /************************************/
 /* Defaults _you_ may want to tweak */
 /************************************/
@@ -12,7 +14,7 @@
 /* the period of time the client is allowed to use that address */
 #define LEASE_TIME              (60*60*24*10) /* 10 days of seconds */
 
-/* where to find the DHCP server files */
+/* where to find the DHCP server configuration file */
 #define DHCPD_CONF_FILE         "/etc/udhcpd.conf"
 
 /*****************************************************************/
@@ -77,39 +79,6 @@
 #define TRUE			1
 #define FALSE			0
 #define MAC_BCAST_ADDR		"\xff\xff\xff\xff\xff\xff"
-
-
-struct dhcpMessage {
-	u_int8_t op;
-	u_int8_t htype;
-	u_int8_t hlen;
-	u_int8_t hops;
-	u_int32_t xid;
-	u_int16_t secs;
-	u_int16_t flags;
-	u_int32_t ciaddr;
-	u_int32_t yiaddr;
-	u_int32_t siaddr;
-	u_int32_t giaddr;
-	u_int8_t chaddr[16];
-	u_int8_t sname[64];
-	u_int8_t file[128];
-	u_int32_t cookie;
-	u_int8_t options[308]; /* 312 - cookie */ 
-};
-
-struct udp_dhcp_packet {
-	struct iphdr ip;
-	struct udphdr udp;
-	struct dhcpMessage data;
-};
-
-struct dhcpOfferedAddr {
-	u_int8_t chaddr[16];
-	u_int32_t yiaddr;	/* network order */
-	u_int32_t expires;	/* host order */
-};
-
 #define OPT_CODE 0
 #define OPT_LEN 1
 
@@ -118,7 +87,7 @@ struct option_set {
 	struct option_set *next;
 };
 
-struct server_config {
+struct server_config_t {
 	u_int32_t server;		/* Our IP, in network order */
 	u_int32_t start;		/* Start address of leases, network order */
 	u_int32_t end;			/* End of leases, network order */
@@ -142,7 +111,7 @@ struct server_config {
 	char *notify_file;		/* What to run whenever leases are written */
 };	
 
-extern struct server_config config;
+extern struct server_config_t server_config;
 extern struct dhcpOfferedAddr *leases;
 		
 

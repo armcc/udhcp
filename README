@@ -43,16 +43,95 @@ The format is fairly simple, there is a sample file with all the
 available options and comments describing them in samples/udhcpd.conf
 
 
+udhcp client (udhcpc)
+--------------------
+
+The udhcp client negotiates a lease with the DHCP server and notifies
+a set of scripts when a leases is obtained or lost. The command line
+options for the udhcp client are:
+
+-d, --dir=PATH                  Path containing DHCP client scripts 
+					(default: /etc/udhcpc/)
+-p, --prefix=PREFIX             Prefix to add to scripts (default: none)
+-i, --interface=INTERFACE       Interface to use (default: eth0)
+-r, --request=IP                IP address to request (default: none)
+-c, --clientid=CLIENTID         Client identifier
+-v, --version                   Display version
+
+If the requested IP address cannot be obtained, the client accepts the
+address that the server offers.
+
+When an event occurs, udhcpc calls one one of the scripts. The scripts
+aro by default contained in /etc/udhcpc/ but this can be changed via the
+command line arguments. The three scripts that are called are:
+
+	<prefix>deconfig: This script is called when udhcpc starts, and
+	when a leases is lost. The script should put the interface in an
+	up, but deconfigured state, ie: ifconfig $interface 0.0.0.0.
+	
+	<prefix>bound: This script is called when udhcpc moves from an
+	unbound, to a bound state. All of the paramaters are set in
+	enviromental variables, as well as written to a file, 
+	<dir>/<prefix>info (ie, /etc/udhcpc/ext.info). This script should
+	configure the interface, and set any other relavent parameter
+	(default gateway, dns server, etc).
+	
+	<prefix>renew: This script is called when a DHCP lease is renewed.
+	All of the paramaters are set in enviromental variables, as well
+	as written to the info file. This is called when the interface is
+	already configured, so the ip address will not change, however,
+	the other DHCP paramaters, such as the default gateway, subnet mask,
+	and dns server may change.
+
+The paramaters for the config file and enviromental variables are as follows:
+
+	interface	- The interface this was obtained on
+	ip		- The obtained IP
+	subnet		- The assigend subnet mask
+	timezone	- Offset in seconds from UTC
+	router		- A list of routers
+	timesvr		- A list of time servers
+	namesvr		- A list of IEN 116 name servers
+	dns		- A list of DNS server
+	logsvr		- A list of MIT-LCS UDP log servers
+	cookiesvr	- A list of RFC 865 cookie servers
+	lprsvr		- A list of LPR servers
+	hostname	- The assigned hostname
+	bootsize	- The length in 512 octect blocks of the bootfile
+	domain		- The domain name of the network
+	swapsvr		- The IP address of the client's swap server
+	rootpath	- The path name of the client's root disk
+	mtu		- The MTU to use for this network
+	broadcast	- The broadcast address for this network
+	ntpsrv		- A list of NTP servers
+	wins		- A list of WINS servers
+	lease		- The lease time, in seconds
+	dhcptype	- DHCP message type (safely ignored)
+	serverid	- The IP of the server
+	tftp		- The TFTP server name
+	bootfile	- The bootfile name
+
+additional options are easily added in options.c.
+	
+udhcpc also responds to SIGUSR1 and SIGUSR2. SIGUSR1 will force a renew state,
+and SIGUSR2 will force a release of the current lease, and cause udhcpc to
+go into an inactive state (until it is killed, or receives a SIGUSR1).
+
+
+
 compile time options
 -------------------
 
-The Makefile contains two of the compile time options:
+The Makefile contains three of the compile time options:
 	
 	DEBUG: If DEBUG is defined, udhcpd will output extra debugging
 	output, compile with -g, and not fork to the background when run.
-	
 	SYSLOG: If SYSLOG is defined, udhcpd will log all its messages
 	syslog, otherwise, it will attempt to log them to stdout.
+	
+	COMBINED_BINARY: If COMBINED_BINARY is define, one binary, udhcpd,
+	is created. If called as udhcpd, the dhcp server will be started.
+	If called as udhcpc, the dhcp client will be started.
 	
 dhcpd.h contains the other two compile time options:
 	

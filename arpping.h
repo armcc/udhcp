@@ -38,6 +38,6 @@ struct ifinfo {
 
 
 /* function prototypes */
-int arpping(u_int32_t yiaddr);
+int arpping(u_int32_t yiaddr, u_int32_t ip, char *arp, char *interface);
 
 #endif

@@ -13,6 +13,50 @@
 #include "leases.h"
 
 
+/* supported options are easily added here */
+struct dhcp_option options[] = {
+	/* name[10]	flags				code */
+	{"subnet",	OPTION_IP,			0x01},
+	{"timezone",	OPTION_S32,			0x02},
+	{"router",	OPTION_IP | OPTION_LIST,	0x03},
+	{"timesvr",	OPTION_IP | OPTION_LIST,	0x04},
+	{"namesvr",	OPTION_IP | OPTION_LIST,	0x05},
+	{"dns",		OPTION_IP | OPTION_LIST,	0x06},
+	{"logsvr",	OPTION_IP | OPTION_LIST,	0x07},
+	{"cookiesvr",	OPTION_IP | OPTION_LIST,	0x08},
+	{"lprsvr",	OPTION_IP | OPTION_LIST,	0x09},
+	{"hostname",	OPTION_STRING,			0x0c},
+	{"bootsize",	OPTION_U16,			0x0d},
+	{"domain",	OPTION_STRING,			0x0f},
+	{"swapsvr",	OPTION_IP,			0x10},
+	{"rootpath",	OPTION_STRING,			0x11},
+	{"mtu",		OPTION_U16,			0x1a},
+	{"broadcast",	OPTION_IP,			0x1c},
+	{"ntpsrv",	OPTION_IP | OPTION_LIST,	0x2a},
+	{"wins",	OPTION_IP | OPTION_LIST,	0x2c},
+	{"requestip",	OPTION_IP,			0x32},
+	{"lease",	OPTION_U32,			0x33},
+	{"dhcptype",	OPTION_U8,			0x35},
+	{"serverid",	OPTION_IP,			0x36},
+	{"tftp",	OPTION_STRING,			0x42},
+	{"bootfile",	OPTION_STRING,			0x43},
+	{"",		0x00,				0x00}
+};
+
+/* Lengths of the different option types */
+int option_lengths[] = {
+	[OPTION_IP] =		4,
+	[OPTION_IP_PAIR] =	8,
+	[OPTION_BOOLEAN] =	1,
+	[OPTION_STRING] =	0,
+	[OPTION_U8] =		1,
+	[OPTION_U16] =		2,
+	[OPTION_S16] =		2,
+	[OPTION_U32] =		4,
+	[OPTION_S32] =		4
+};
+
+
 /* get an option with bounds checking (warning, not aligned). */
 unsigned char *get_option(struct dhcpMessage *packet, int code)
 {
@@ -68,6 +112,7 @@ unsigned char *get_option(struct dhcpMessage *packet, int code)
 	return NULL;
 }
 
+
 /* return the position of the 'end' option (no bounds checking) */
 int end_option(unsigned char *optionptr) 
 {
@@ -79,6 +124,7 @@ int end_option(unsigned char *optionptr)
 	}
 	return i;
 }
+
 
 /* add an option string to the options (an option string contains an option code,
  * length, then data) */
@@ -99,18 +145,6 @@ int add_option_string(unsigned char *optionptr, unsigned char *string)
 	return string[OPT_LEN] + 2;
 }
 
-/* add an option that was loaded from dhcpd.conf to a packet */
-int add_stored_option(unsigned char *optionptr, unsigned char code)
-{
-	struct option_set *curr = config.options;
-	
-	while (curr && curr->data[OPT_CODE] > code)
-		curr = curr->next;
-		
-	if (curr && curr->data[OPT_CODE] == code) {
-		return add_option_string(optionptr, curr->data);
-	} else return 0;
-}
 
 /* add a one to four byte option to a packet */
 int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t data)
@@ -125,8 +159,11 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 			break;
 		}
 		
-	if (!length) return 0;
-
+	if (!length) {
+		DEBUG(LOG_ERR, "Could not add option 0x%02x", code);
+		return 0;
+	}
+	
 	end = end_option(optionptr);
 	optionptr[end + OPT_CODE] = code;
 	optionptr[end + OPT_LEN] = length;
@@ -141,6 +178,7 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 	return length;
 }
 
+
 /* find option 'code' in opt_list */
 struct option_set *find_option(struct option_set *opt_list, char code)
 {
@@ -150,6 +188,7 @@ struct option_set *find_option(struct option_set *opt_list, char code)
 	if (opt_list && opt_list->data[OPT_CODE] == code) return opt_list;
 	else return NULL;
 }
+
 
 /* add an option to the opt_list */
 void attach_option(struct option_set **opt_list, struct dhcp_option *option, char *buffer, int length)

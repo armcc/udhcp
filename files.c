@@ -17,47 +17,6 @@
 #include "leases.h"
 
 
-/* supported options are easily added here */
-struct dhcp_option options[] = {
-	/* name[10]	flags				code */
-	{"subnet",	OPTION_IP,			0x01},
-	{"timezone",	OPTION_S32,			0x02},
-	{"router",	OPTION_IP | OPTION_LIST,	0x03},
-	{"timesvr",	OPTION_IP | OPTION_LIST,	0x04},
-	{"namesvr",	OPTION_IP | OPTION_LIST,	0x05},
-	{"dns",		OPTION_IP | OPTION_LIST,	0x06},
-	{"logsvr",	OPTION_IP | OPTION_LIST,	0x07},
-	{"cookiesvr",	OPTION_IP | OPTION_LIST,	0x08},
-	{"lprsvr",	OPTION_IP | OPTION_LIST,	0x09},
-	{"bootsize",	OPTION_U16,			0x0d},
-	{"domain",	OPTION_STRING,			0x0f},
-	{"swapsvr",	OPTION_IP,			0x10},
-	{"rootpath",	OPTION_STRING,			0x11},
-	{"mtu",		OPTION_U16,			0x1a},
-	{"broadcast",	OPTION_IP,			0x1c},
-	{"wins",	OPTION_IP | OPTION_LIST,	0x2c},
-	{"lease",	OPTION_U32,			0x33},
-	{" dhcptype",	OPTION_U8,			0x35}, /* cannot be in config file */
-	{" serverid",	OPTION_IP,			0x36}, /* ditto */
-	{"ntpsrv",	OPTION_IP | OPTION_LIST,	0x3a},
-	{"tftp",	OPTION_STRING,			0x42},
-	{"bootfile",	OPTION_STRING,			0x43},
-	{"",		0x00,				0x00}
-};
-
-/* Lengths of the different option types */
-int option_lengths[] = {
-	[OPTION_IP] =		4,
-	[OPTION_IP_PAIR] =	8,
-	[OPTION_BOOLEAN] =	1,
-	[OPTION_STRING] =	0,
-	[OPTION_U8] =		1,
-	[OPTION_U16] =		2,
-	[OPTION_S16] =		2,
-	[OPTION_U32] =		4,
-	[OPTION_S32] =		4
-};
-
 /* on these functions, make sure you datatype matches */
 static int read_ip(char *line, void *arg)
 {
@@ -65,6 +24,7 @@ static int read_ip(char *line, void *arg)
 	inet_aton(line, addr);
 	return 1;
 }
+
 
 static int read_str(char *line, void *arg)
 {
@@ -75,12 +35,14 @@ static int read_str(char *line, void *arg)
 	return 1;
 }
 
+
 static int read_u32(char *line, void *arg)
 {
 	u_int32_t *dest = arg;
 	*dest = strtoul(line, NULL, 0);
 	return 1;
 }
+
 
 static int read_yn(char *line, void *arg)
 {
@@ -94,6 +56,7 @@ static int read_yn(char *line, void *arg)
 	return 1;
 }
 
+
 /* read a dhcp option and add it to opt_list */
 static int read_opt(char *line, void *arg)
 {
@@ -105,8 +68,8 @@ static int read_opt(char *line, void *arg)
 	char buffer[255];
 	u_int16_t result_u16;
 	int16_t result_s16;
-	u_int16_t result_u32;
-	int16_t result_s32;
+	u_int32_t result_u32;
+	int32_t result_s32;
 	
 	int i;
 	
@@ -131,7 +94,7 @@ static int read_opt(char *line, void *arg)
 				break;
 			case OPTION_IP_PAIR:
 				read_ip(val, buffer);
-				if ((val = strtok(NULL, ", \t")))
+				if ((val = strtok(NULL, ", \t/-")))
 					read_ip(val, buffer + 4);
 				else fail = 1;
 				break;
@@ -173,25 +136,27 @@ static int read_opt(char *line, void *arg)
 	return 1;
 }
 
+
 static struct config_keyword keywords[] = {
-	/* keyword	handler   variable address	default */
-	{"start",	read_ip,  &(config.start),	"192.168.0.20"},
-	{"end",		read_ip,  &(config.end),	"192.168.0.254"},
-	{"interface",	read_str, &(config.interface),	"eth0"},
-	{"option",	read_opt, &(config.options),	""},
-	{"opt",		read_opt, &(config.options),	""},
-	{"max_leases",	read_u32, &(config.max_leases),	"254"},
-	{"remaining",	read_yn,  &(config.remaining),	"yes"},
-	{"auto_time",	read_u32, &(config.auto_time),	"7200"},
-	{"decline_time",read_u32, &(config.decline_time),"3600"},
-	{"conflict_time",read_u32,&(config.conflict_time),"3600"},
-	{"offer_time",	read_u32, &(config.offer_time),	"60"},
-	{"min_lease",	read_u32, &(config.min_lease),	"60"},
-	{"lease_file",	read_str, &(config.lease_file),	"/etc/udhcpd.leases"},
-	{"pid_file",	read_str, &(config.pid_file),	"/var/run/udhcpd.pid"},
-	{"notify_file", read_str, &(config.notify_file),""},
-	{"",		NULL, NULL, 			""}
+	/* keyword	handler   variable address		default */
+	{"start",	read_ip,  &(server_config.start),	"192.168.0.20"},
+	{"end",		read_ip,  &(server_config.end),		"192.168.0.254"},
+	{"interface",	read_str, &(server_config.interface),	"eth0"},
+	{"option",	read_opt, &(server_config.options),	""},
+	{"opt",		read_opt, &(server_config.options),	""},
+	{"max_leases",	read_u32, &(server_config.max_leases),	"254"},
+	{"remaining",	read_yn,  &(server_config.remaining),	"yes"},
+	{"auto_time",	read_u32, &(server_config.auto_time),	"7200"},
+	{"decline_time",read_u32, &(server_config.decline_time),"3600"},
+	{"conflict_time",read_u32,&(server_config.conflict_time),"3600"},
+	{"offer_time",	read_u32, &(server_config.offer_time),	"60"},
+	{"min_lease",	read_u32, &(server_config.min_lease),	"60"},
+	{"lease_file",	read_str, &(server_config.lease_file),	"/etc/udhcpd.leases"},
+	{"pid_file",	read_str, &(server_config.pid_file),	"/var/run/udhcpd.pid"},
+	{"notify_file", read_str, &(server_config.notify_file),	""},
+	{"",		NULL, 	  NULL,				""}
 };
+
 
 int read_config(char *file)
 {
@@ -230,6 +195,7 @@ int read_config(char *file)
 	return 1;
 }
 
+
 /* the dummy var is here so this can be a signal handler */
 void write_leases(int dummy)
 {
@@ -241,14 +207,14 @@ void write_leases(int dummy)
 	
 	dummy = 0;
 	
-	if (!(fp = fopen(config.lease_file, "w"))) {
-		LOG(LOG_ERR, "Unable to open %s for writing", config.lease_file);
+	if (!(fp = fopen(server_config.lease_file, "w"))) {
+		LOG(LOG_ERR, "Unable to open %s for writing", server_config.lease_file);
 		return;
 	}
 	
-	for (i = 0; i < config.max_leases; i++) {
+	for (i = 0; i < server_config.max_leases; i++) {
 		if (leases[i].yiaddr != 0) {
-			if (config.remaining) {
+			if (server_config.remaining) {
 				if (lease_expired(&(leases[i])))
 					lease_time = 0;
 				else lease_time = leases[i].expires - curr;
@@ -261,11 +227,12 @@ void write_leases(int dummy)
 	}
 	fclose(fp);
 	
-	if (strlen(config.notify_file)) {
-		sprintf(buf, "%s %s", config.notify_file, config.lease_file);
+	if (server_config.notify_file) {
+		sprintf(buf, "%s %s", server_config.notify_file, server_config.lease_file);
 		system(buf);
 	}
 }
+
 
 void read_leases(char *file)
 {
@@ -279,11 +246,11 @@ void read_leases(char *file)
 		return;
 	}
 	
-	while (i < config.max_leases && (fread(&lease, sizeof lease, 1, fp) == 1)) {
-		if (lease.yiaddr >= config.start && lease.yiaddr <= config.end) {
+	while (i < server_config.max_leases && (fread(&lease, sizeof lease, 1, fp) == 1)) {
+		if (lease.yiaddr >= server_config.start && lease.yiaddr <= server_config.end) {
 			leases[i].yiaddr = lease.yiaddr;
 			leases[i].expires = ntohl(lease.expires);	
-			if (config.remaining) leases[i].expires += curr;
+			if (server_config.remaining) leases[i].expires += curr;
 			memcpy(leases[i].chaddr, lease.chaddr, sizeof(lease.chaddr));
 			i++;
 		}
@@ -291,7 +258,7 @@ void read_leases(char *file)
 	
 	DEBUG(LOG_INFO, "Read %d leases", i);
 	
-	if (i == config.max_leases) {
+	if (i == server_config.max_leases) {
 		if (fgetc(fp) == EOF)
 			/* might be helpfull to drop expired leases */
 			LOG(LOG_WARNING, "Too many leases while loading %s\n", file);

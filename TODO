@@ -7,3 +7,5 @@ TODO
 + make config file a command line option
 + make forking a command line option
 + make sure packet generation works on a wide varitey of arches
++ Interoperability testing
++ Hooks within the DHCP server

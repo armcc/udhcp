@@ -9,6 +9,8 @@
 
 #ifdef SYSLOG
 # define LOG(level, str, args...) syslog(level, str, ## args)
+# define OPEN_LOG(name) openlog(name, 0, 0)
+#define CLOSE_LOG() closelog()
 #else
 # define LOG_EMERG	"EMERGENCY!"
 # define LOG_ALERT	"ALERT!"
@@ -20,6 +22,8 @@
 # define LOG(level, str, args...) do { printf("%s, ", level); \
 				printf(str, ## args); \
 				printf("\n"); } while(0)
+# define OPEN_LOG(name) do {;} while(0)
+#define CLOSE_LOG() do {;} while(0)
 #endif
 
 #ifdef DEBUG
@@ -27,7 +31,7 @@
 # define DEBUG(level, str, args...) LOG(level, str, ## args)
 # define DEBUGGING
 #else
-# define DEBUG(level, str, args...)
+# define DEBUG(level, str, args...) do {;} while(0)
 #endif
 
 #endif

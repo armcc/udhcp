@@ -34,15 +34,15 @@ int openRawSocket (int *s, u_short type);
  *		0 addr used
  *		-1 error 
  */  
-int arpping(u_int32_t yiaddr) {
+int arpping(u_int32_t yiaddr, u_int32_t ip, char *arp, char *interface) {
 	struct ifinfo ifbuf;
 
-	strcpy(ifbuf.ifname, config.interface);
-	ifbuf.addr = config.server;
+	strcpy(ifbuf.ifname, interface);
+	ifbuf.addr = ip;
 	ifbuf.mask = 0x0;
 	ifbuf.bcast = 0x0;
 	
-	memcpy(ifbuf.haddr, config.arp, 6);
+	memcpy(ifbuf.haddr, arp, 6);
 	ifbuf.flags = 0;
 	
 	return arpCheck(yiaddr, &ifbuf, 2);
