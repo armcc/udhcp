@@ -91,18 +91,22 @@ u_int16_t checksum(void *addr, int count)
 	register int32_t sum = 0;
 	u_int16_t *source = (u_int16_t *) addr;
 
-	while( count > 1 )  {
+	while (count > 1)  {
 		/*  This is the inner loop */
 		sum += *source++;
 		count -= 2;
 	}
 
 	/*  Add left-over byte, if any */
-	if( count > 0 )
-		sum += * (unsigned char *) source;
-
+	if (count > 0) {
+		/* Make sure that the left-over byte is added correctly both
+		 * with little and big endian hosts */
+		u_int16_t tmp = 0;
+		*(unsigned char *) (&tmp) = * (unsigned char *) source;
+		sum += tmp;
+	}
 	/*  Fold 32-bit sum to 16 bits */
-	while (sum>>16)
+	while (sum >> 16)
 		sum = (sum & 0xffff) + (sum >> 16);
 
 	return ~sum;
