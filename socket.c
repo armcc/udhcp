@@ -28,6 +28,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <errno.h>
 #include <features.h>
@@ -42,9 +43,9 @@
 
 #include "debug.h"
 
-int read_interface(char *interface, int *ifindex, unsigned long *addr, char *arp)
+int read_interface(char *interface, int *ifindex, u_int32_t *addr, char *arp)
 {
-	int fd, aliased;
+	int fd;
 	struct ifreq ifr;
 	struct sockaddr_in *sin;
 

@@ -192,7 +192,6 @@ int main(int argc, char *argv[])
 	int fd, retval;
 	struct timeval tv;
 	int c, len;
-	struct ifreq ifr;
 	struct dhcpMessage packet;
 	struct in_addr temp_addr;
 	int pid_fd;

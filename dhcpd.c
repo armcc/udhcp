@@ -91,13 +91,7 @@ int main(int argc, char *argv[])
 	unsigned long timeout_end;
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
-	struct sockaddr_in *sin;
 	int pid_fd;
-			
-	/* server ip addr */
-	int fd = -1;
-	struct ifreq ifr;
-
 	argc = argv[0][0]; /* get rid of some warnings */
 	
 	OPEN_LOG("udhcpd");
