@@ -82,7 +82,8 @@ int main(void) {
 	int bytes, retval;
 	struct dhcpMessage packet;
 	unsigned char *state;
-	u_int32_t *server_id, *requested;
+	char *server_id, *requested;
+	u_int32_t server_id_align, requested_align;
 	unsigned long timeout_end;
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
@@ -209,21 +210,24 @@ int main(void) {
  		case DHCPREQUEST:
 			DEBUG(LOG_INFO,"received REQUEST");
 
-			requested = (u_int32_t *) get_option(&packet, DHCP_REQUESTED_IP);
-			server_id = (u_int32_t *) get_option(&packet, DHCP_SERVER_ID);
+			requested = get_option(&packet, DHCP_REQUESTED_IP);
+			server_id = get_option(&packet, DHCP_SERVER_ID);
 
+			if (requested) memcpy(&requested_align, requested, 4);
+			if (server_id) memcpy(&server_id_align, server_id, 4);
+		
 			if (lease) {
 				if (server_id) {
 					/* SELECTING State */
 					DEBUG(LOG_INFO, "server_id = %08x", ntohl(*server_id));
-					if (*server_id == config.server && requested && 
-					    *requested == lease->yiaddr) {
+					if (server_id_align == config.server && requested && 
+					    requested_align == lease->yiaddr) {
 						sendACK(&packet, lease->yiaddr);
 					}
 				} else {
 					if (requested) {
 						/* INIT-REBOOT State */
-						if (lease->yiaddr == *requested)
+						if (lease->yiaddr == requested_align)
 							sendACK(&packet, lease->yiaddr);
 						else sendNAK(&packet);
 					} else {
@@ -320,7 +324,8 @@ int sendOffer(struct dhcpMessage *oldpacket) {
 
 	struct dhcpMessage packet;
 	struct dhcpOfferedAddr *lease = NULL;
-	u_int32_t *req, lease_time = config.lease;
+	u_int32_t req_align, lease_time_align = config.lease;
+	char *req, *lease_time;
 	struct option_set *curr;
 	struct in_addr addr;
 
@@ -329,15 +334,18 @@ int sendOffer(struct dhcpMessage *oldpacket) {
 	/* the client is in our lease/offered table */
 	if ((lease = find_lease_by_chaddr(oldpacket->chaddr))) {
 		if (!lease_expired(lease)) 
-			lease_time = lease->expires - time(0);
+			lease_time_align = lease->expires - time(0);
 		packet.yiaddr = lease->yiaddr;
 		
 	/* Or the client has a requested ip */
-	} else if ((req = (u_int32_t *) get_option(oldpacket, DHCP_REQUESTED_IP)) &&
+	} else if ((req = get_option(oldpacket, DHCP_REQUESTED_IP)) &&
+
+		   /* Don't look here (ugly hackish thing to do) */
+		   memcpy(&req_align, req, 4) &&
 
 		   /* and the ip is in the lease range */
-		   ntohl(*req) >= ntohl(config.start) &&
-		   ntohl(*req) <= ntohl(config.end) &&
+		   ntohl(req_align) >= ntohl(config.start) &&
+		   ntohl(req_align) <= ntohl(config.end) &&
 		   
 		   /* and its not already taken/offered */
 		   ((!(lease = find_lease_by_yiaddr(*req)) ||
@@ -365,12 +373,14 @@ int sendOffer(struct dhcpMessage *oldpacket) {
 		return -1;
 	}		
 
-	if (get_option(oldpacket, DHCP_LEASE_TIME)) {
-		lease_time = ntohl(*((u_int32_t *)get_option(oldpacket, DHCP_LEASE_TIME)));
-		if (lease_time > config.lease) lease_time = config.lease;
+	if ((lease_time = get_option(oldpacket, DHCP_LEASE_TIME))) {
+		memcpy(&lease_time_align, lease_time, 4);
+		lease_time_align = ntohl(lease_time_align);
+		if (lease_time_align > config.lease) 
+			lease_time_align = config.lease;
 	}
 		
-	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time);
+	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time_align);
 
 	curr = config.options;
 	while (curr) {
@@ -398,19 +408,23 @@ int sendNAK(struct dhcpMessage *oldpacket) {
 int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr) {
 	struct dhcpMessage packet;
 	struct option_set *curr;
-	u_int32_t lease_time = config.lease;
+	char *lease_time;
+	u_int32_t lease_time_align = config.lease;
 	struct in_addr addr;
 
 	init_packet(&packet, oldpacket, DHCPACK);
 	packet.yiaddr = yiaddr;
 	
-	if (get_option(oldpacket, DHCP_LEASE_TIME)) {
-		lease_time = ntohl(*((u_int32_t *)get_option(oldpacket, DHCP_LEASE_TIME)));
-		if (lease_time > config.lease) lease_time = config.lease;
-		else if (lease_time < config.min_lease) lease_time = config.lease;
+	if ((lease_time = get_option(oldpacket, DHCP_LEASE_TIME))) {
+		memcpy(&lease_time_align, lease_time, 4);
+		lease_time_align = ntohl(lease_time_align);
+		if (lease_time_align > config.lease) 
+			lease_time_align = config.lease;
+		else if (lease_time_align < config.min_lease) 
+			lease_time_align = config.lease;
 	}
 	
-	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time);
+	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time_align);
 	
 	curr = config.options;
 	while (curr) {
@@ -425,7 +439,7 @@ int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr) {
 	if (send_packet(&packet, 0) < 0) 
 		return -1;
 
-	add_lease(packet.chaddr, packet.yiaddr, lease_time);
+	add_lease(packet.chaddr, packet.yiaddr, lease_time_align);
 
 	return 0;
 }

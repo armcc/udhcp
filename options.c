@@ -13,7 +13,7 @@
 #include "leases.h"
 
 
-/* get an option with bounds checking. */
+/* get an option with bounds checking (warning, not aligned). */
 unsigned char *get_option(struct dhcpMessage *packet, int code)
 {
 	int i, length;
@@ -117,6 +117,7 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 {
 	char length = 0;
 	int i, end;
+	char buffer[4]; /* Cant copy straight to optionptr, it might not be aligned */
 
 	for (i = 0; options[i].code; i++)
 		if (options[i].code == code) {
@@ -129,11 +130,13 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 	end = end_option(optionptr);
 	optionptr[end + OPT_CODE] = code;
 	optionptr[end + OPT_LEN] = length;
+
 	switch (length) {
-		case 1: optionptr[end + 2] = data; break;
-		case 2: *((u_int16_t *) &optionptr[end + 2]) = htons(data); break;
-		case 4: *((u_int32_t *) &optionptr[end + 2]) = htonl(data); break;
+		case 1: buffer[0] = (char) data; break;
+		case 2: *((u_int16_t *) buffer) = htons(data); break;
+		case 4: *((u_int32_t *) buffer) = htonl(data); break;
 	}
+	memcpy(&optionptr[end + 2], buffer, length);
 	optionptr[end + length + 2] = DHCP_END;
 	return length;
 }
