@@ -1,6 +1,7 @@
 0.9.8 (pending)
 + change sys_errlist[] to strerror() as it aparently doesn't exist
 + fixed get_raw_packet so it returns -2 on non fatal errors
++ Improved (hopefully) NAKing behavior
 
 0.9.7 (020526)
 + Use add_lease in read_leases, sanitizes leases more, and clears out exprired

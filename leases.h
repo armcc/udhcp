@@ -9,6 +9,7 @@ struct dhcpOfferedAddr {
 	u_int32_t expires;	/* host order */
 };
 
+extern unsigned char blank_chaddr[];
 
 void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr);
 struct dhcpOfferedAddr *add_lease(u_int8_t *chaddr, u_int32_t yiaddr, unsigned long lease);

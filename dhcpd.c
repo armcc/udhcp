@@ -220,7 +220,27 @@ int main(int argc, char *argv[])
 						}
 					}						
 				}
-			} /* else remain silent */				
+			
+			/* what to do if we have no record of the client */
+			} else if (server_id) {
+				/* SELECTING State */
+
+			} else if (requested) {
+				/* INIT-REBOOT State */
+				if ((lease = find_lease_by_yiaddr(requested_align))) {
+					if (lease_expired(lease)) {
+						/* probably best if we drop this lease */
+						memset(lease->chaddr, 0, 16);
+					/* make some contention for this address */
+					} else sendNAK(&packet);
+				} else if (requested_align < server_config.start || 
+					   requested_align > server_config.end) {
+					sendNAK(&packet);
+				} /* else remain silent */
+
+			} else {
+				 /* RENEWING or REBINDING State */
+			}
 			break;
 		case DHCPDECLINE:
 			DEBUG(LOG_INFO,"received DECLINE");
