@@ -1,4 +1,5 @@
-0.9.3 (pending)
+0.9.3 (010820)
++ Increased debugging verbosity (me)
 + Cut trailing whitespace when reading config file (me)
 + added hostname option to client (me)
 + fixed a strncpy bug in script.c (me)

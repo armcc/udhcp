@@ -75,7 +75,7 @@ static void print_usage(void)
 static void renew_requested(int pid)
 {
 	pid = 0;
-	DEBUG(LOG_INFO, "Received SIGUSR1");
+	LOG(LOG_INFO, "Received SIGUSR1");
 	if (state == BOUND || state == RENEWING || state == REBINDING ||
 	    state == RELEASED) {
 	    	listen_mode = LISTEN_KERNEL;
@@ -98,7 +98,7 @@ static void renew_requested(int pid)
 static void release_requested(int pid)
 {
 	pid = 0;
-	DEBUG(LOG_INFO, "Received SIGUSR2");
+	LOG(LOG_INFO, "Received SIGUSR2");
 	/* send release packet */
 	if (state == BOUND || state == RENEWING || state == REBINDING) {
 		send_release(server_addr, requested_ip); /* unicast */
@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
 	int c, len;
 	struct ifreq ifr;
 	struct dhcpMessage packet;
+	struct in_addr temp_addr;
 
 	static struct option options[] = {
 		{"dir", 1, 0, 'd'},
@@ -399,7 +400,9 @@ int main(int argc, char *argv[])
 					
 					/* little fixed point for n * .875 */
 					t2 = (lease * 0x7) >> 3;
-					LOG(LOG_INFO, "Lease obtained, lease time %ld", lease);
+					temp_addr.s_addr = packet.yiaddr;
+					LOG(LOG_INFO, "Lease of %s obtained, lease time %ld", 
+						inet_ntoa(temp_addr), lease);
 					start = time(0);
 					timeout = t1 + start;
 					requested_ip = packet.yiaddr;
@@ -412,7 +415,7 @@ int main(int argc, char *argv[])
 					
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
-					DEBUG(LOG_INFO, "Received DHCP NAK");
+					LOG(LOG_INFO, "Received DHCP NAK");
 					if (state != REQUESTING) script_deconfig();
 					state = INIT_SELECTING;
 					timeout = time(0);

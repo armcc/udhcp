@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 
 #include "dhcpd.h"
@@ -92,7 +94,7 @@ int send_discover(unsigned long xid, unsigned long requested)
 		add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(requested));
 
 	add_requests(&packet);
-	DEBUG(LOG_DEBUG, "Sending discover...");
+	LOG(LOG_DEBUG, "Sending discover...");
 	return raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST, 
 				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
 }
@@ -102,6 +104,7 @@ int send_discover(unsigned long xid, unsigned long requested)
 int send_selecting(unsigned long xid, unsigned long server, unsigned long requested)
 {
 	struct dhcpMessage packet;
+	struct in_addr addr;
 
 	init_packet(&packet, DHCPREQUEST);
 	packet.xid = xid;
@@ -113,7 +116,8 @@ int send_selecting(unsigned long xid, unsigned long server, unsigned long reques
 	add_simple_option(packet.options, DHCP_SERVER_ID, ntohl(server));
 	
 	add_requests(&packet);
-	DEBUG(LOG_DEBUG, "Sending select...");
+	addr.s_addr = requested;
+	LOG(LOG_DEBUG, "Sending select for %s...", inet_ntoa(addr));
 	return raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST, 
 				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
 }
@@ -129,7 +133,7 @@ int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr)
 	packet.xid = xid;
 	packet.ciaddr = ciaddr;
 
-	DEBUG(LOG_DEBUG, "Sending renew...");
+	LOG(LOG_DEBUG, "Sending renew...");
 	if (server) 
 		ret = kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
 	else ret = raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST,
@@ -151,7 +155,7 @@ int send_release(unsigned long server, unsigned long ciaddr)
 	add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(ciaddr));
 	add_simple_option(packet.options, DHCP_SERVER_ID, ntohl(server));
 
-	DEBUG(LOG_DEBUG, "Sending release...");
+	LOG(LOG_DEBUG, "Sending release...");
 	return kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
 }
 

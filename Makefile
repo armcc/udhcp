@@ -14,7 +14,7 @@
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 
-VER := 0.9.2
+VER := 0.9.3
 
 
 OBJS_SHARED = options.o socket.o packet.o
