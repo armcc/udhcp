@@ -1,10 +1,11 @@
 # udhcp makefile
 
-prefix=/usr
-SBINDIR=/sbin
-USRSBINDIR=${prefix}/sbin
-USRBINDIR=${prefix}/bin
-USRSHAREDIR=${prefix}/share
+DESTDIR     = 
+prefix      = /usr
+SBINDIR     = /sbin
+USRSBINDIR  = $(DESTDIR)${prefix}/sbin
+USRBINDIR   = $(DESTDIR)${prefix}/bin
+USRSHAREDIR = $(DESTDIR)${prefix}/share
 
 # Uncomment this to get a shared binary. Call as udhcpd for the server,
 # and udhcpc for the client
@@ -40,9 +41,9 @@ endif
 EXEC3 = dumpleases
 OBJS3 = dumpleases.o
 
-BOOT_PROGRAMS = udhcpc
-DAEMONS = udhcpd
-COMMANDS = dumpleases
+BOOT_PROGRAM = udhcpc
+DAEMON = udhcpd
+COMMAND = dumpleases
 
 ifdef UDHCP_SYSLOG
 CFLAGS += -DUDHCP_SYSLOG
@@ -78,26 +79,25 @@ $(EXEC3): $(OBJS3)
 
 
 install: all
-
-	$(INSTALL) $(DAEMONS) $(USRSBINDIR)
-	$(INSTALL) $(COMMANDS) $(USRBINDIR)
+	mkdir -p $(USRSBINDIR) $(USRBINDIR) 
+	$(INSTALL) -m 755 $(DAEMON) $(USRSBINDIR)
+	$(INSTALL) -m 755 $(COMMAND) $(USRBINDIR)
 ifdef COMBINED_BINARY
-	ln -sf $(USRSBINDIR)/$(DAEMONS) $(SBINDIR)/$(BOOT_PROGRAMS)
+	ln -sf $(DAEMON) $(USRSBINDIR)/$(BOOT_PROGRAM)
 else
-	$(INSTALL) $(BOOT_PROGRAMS) $(SBINDIR)
+	$(INSTALL) -m 755 $(BOOT_PROGRAM) $(USRSBINDIR)
 endif
 	mkdir -p $(USRSHAREDIR)/udhcpc
-	for name in bound deconfig renew script ; do \
-		$(INSTALL) samples/sample.$$name \
+	for name in bound deconfig nak renew script ; do \
+		$(INSTALL) -m 755 samples/sample.$$name \
 			$(USRSHAREDIR)/udhcpc/default.$$name ; \
 	done
 	mkdir -p $(USRSHAREDIR)/man/man1
-	$(INSTALL) dumpleases.1 $(USRSHAREDIR)/man/man1
+	$(INSTALL) -m 644 dumpleases.1 $(USRSHAREDIR)/man/man1
 	mkdir -p $(USRSHAREDIR)/man/man5
-	$(INSTALL) udhcpd.conf.5 $(USRSHAREDIR)/man/man5
+	$(INSTALL) -m 644 udhcpd.conf.5 $(USRSHAREDIR)/man/man5
 	mkdir -p $(USRSHAREDIR)/man/man8
-	$(INSTALL) udhcpc.8 udhcpd.8 $(USRSHAREDIR)/man/man8
+	$(INSTALL) -m 644 udhcpc.8 udhcpd.8 $(USRSHAREDIR)/man/man8
 
 clean:
 	-rm -f udhcpd udhcpc dumpleases *.o core
-
