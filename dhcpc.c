@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 	/* default options */
 	
 	client_config.dir = strdup("/etc/udhcpc/");
-	client_config.prefix = NULL;
+	client_config.prefix = strdup("");
 	strcpy(client_config.interface, "eth0");
 	client_config.clientid = NULL;
 
