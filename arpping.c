@@ -32,7 +32,7 @@
  */  
 
 /* FIXME: match response against chaddr */
-int arpping(u_int32_t yiaddr, u_int32_t ip, char *mac, char *interface)
+int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *mac, char *interface)
 {
 
 	int	timeout = 2;

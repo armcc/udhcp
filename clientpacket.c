@@ -68,7 +68,7 @@ static void init_packet(struct dhcpMessage *packet, char type)
 	memcpy(packet->chaddr, client_config.arp, 6);
 	add_option_string(packet->options, client_config.clientid);
 	if (client_config.hostname) add_option_string(packet->options, client_config.hostname);
-	add_option_string(packet->options, (char *) &vendor_id);
+	add_option_string(packet->options, (unsigned char *) &vendor_id);
 }
 
 

@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 	int bytes, retval;
 	struct dhcpMessage packet;
 	unsigned char *state;
-	char *server_id, *requested;
+	unsigned char *server_id, *requested;
 	u_int32_t server_id_align, requested_align;
 	unsigned long timeout_end;
 	struct option_set *option;
@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
 			continue;
 		}
 		
+		/* ADDME: look for a static lease */
 		lease = find_lease_by_chaddr(packet.chaddr);
 		switch (state[0]) {
 		case DHCPDISCOVER:
@@ -195,7 +196,7 @@ int main(int argc, char *argv[])
 			if (requested) memcpy(&requested_align, requested, 4);
 			if (server_id) memcpy(&server_id_align, server_id, 4);
 		
-			if (lease) {
+			if (lease) { /*ADDME: or static lease */
 				if (server_id) {
 					/* SELECTING State */
 					DEBUG(LOG_INFO, "server_id = %08x", ntohl(server_id_align));

@@ -137,7 +137,7 @@ u_int32_t find_address(int check_expired)
 /* check is an IP is taken, if it is, add it to the lease table */
 int check_ip(u_int32_t addr)
 {
-	char blank_chaddr[] = {[0 ... 15] = 0};
+	unsigned char blank_chaddr[] = {[0 ... 15] = 0};
 	struct in_addr temp;
 	
 	if (arpping(addr, server_config.server, server_config.arp, server_config.interface) == 0) {

@@ -20,8 +20,8 @@ struct client_config_t {
 	char *interface;		/* The name of the interface to use */
 	char *pidfile;			/* Optionally store the process ID */
 	char *script;			/* User script to run at dhcp events */
-	char *clientid;			/* Optional client id to use */
-	char *hostname;			/* Optional hostname to use */
+	unsigned char *clientid;	/* Optional client id to use */
+	unsigned char *hostname;	/* Optional hostname to use */
 	int ifindex;			/* Index number of the interface to use */
 	unsigned char arp[6];		/* Our arp address */
 };

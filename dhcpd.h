@@ -88,7 +88,7 @@
 /* miscellaneous defines */
 #define TRUE			1
 #define FALSE			0
-#define MAC_BCAST_ADDR		"\xff\xff\xff\xff\xff\xff"
+#define MAC_BCAST_ADDR		(unsigned char *) "\xff\xff\xff\xff\xff\xff"
 #define OPT_CODE 0
 #define OPT_LEN 1
 #define OPT_DATA 2

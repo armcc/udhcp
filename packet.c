@@ -52,7 +52,7 @@ int get_packet(struct dhcpMessage *packet, int fd)
 		"MSFT 98",
 		""
 	};
-	char *vendor;
+	char unsigned *vendor;
 
 	memset(packet, 0, sizeof(struct dhcpMessage));
 	bytes = read(fd, packet, sizeof(struct dhcpMessage));
@@ -69,7 +69,7 @@ int get_packet(struct dhcpMessage *packet, int fd)
 	
 	if (packet->op == BOOTREQUEST && (vendor = get_option(packet, DHCP_VENDOR))) {
 		for (i = 0; broken_vendors[i][0]; i++) {
-			if (vendor[OPT_LEN - 2] == (signed) strlen(broken_vendors[i]) &&
+			if (vendor[OPT_LEN - 2] == (unsigned char) strlen(broken_vendors[i]) &&
 			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2])) {
 			    	DEBUG(LOG_INFO, "broken client (%s), forcing broadcast",
 			    		broken_vendors[i]);
@@ -111,7 +111,7 @@ u_int16_t checksum(void *addr, int count)
 
 /* Constuct a ip/udp header for a packet, and specify the source and dest hardware address */
 int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port,
-		   u_int32_t dest_ip, int dest_port, char *dest_arp, int ifindex)
+		   u_int32_t dest_ip, int dest_port, unsigned char *dest_arp, int ifindex)
 {
 	int fd;
 	int result;

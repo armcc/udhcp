@@ -5,8 +5,6 @@
 #ifndef ARPPING_H
 #define ARPPING_H
 
-#define MAC_BCAST_ADDR	"\xff\xff\xff\xff\xff\xff"
-
 #include <netinet/if_ether.h>
 #include <net/if_arp.h>
 #include <net/if.h>
@@ -27,6 +25,6 @@ struct arpMsg {
 };
 
 /* function prototypes */
-int arpping(u_int32_t yiaddr, u_int32_t ip, char *arp, char *interface);
+int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *arp, char *interface);
 
 #endif

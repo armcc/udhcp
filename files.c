@@ -169,6 +169,7 @@ static struct config_keyword keywords[] = {
 	{"siaddr",	read_ip,  &(server_config.siaddr),	"0.0.0.0"},
 	{"sname",	read_str, &(server_config.sname),	""},
 	{"boot_file",	read_str, &(server_config.boot_file),	""},
+	/*ADDME: static lease */
 	{"",		NULL, 	  NULL,				""}
 };
 
@@ -269,6 +270,7 @@ void read_leases(char *file)
 	}
 	
 	while (i < server_config.max_leases && (fread(&lease, sizeof lease, 1, fp) == 1)) {
+		/* ADDME: is it a static lease */
 		if (lease.yiaddr >= server_config.start && lease.yiaddr <= server_config.end) {
 			leases[i].yiaddr = lease.yiaddr;
 			leases[i].expires = ntohl(lease.expires);	

@@ -140,7 +140,8 @@ static char **fill_envp(struct dhcpMessage *packet)
 {
 	int num_options = 0;
 	int i, j;
-	char **envp, *temp;
+	char **envp;
+	unsigned char *temp;
 	char over = 0;
 
 	if (packet == NULL)

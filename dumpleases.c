@@ -29,7 +29,7 @@ struct lease_t {
 int main (int argc, char *argv[]) {
 	FILE *fp;
 	int i, c, mode = REMAINING;
-	unsigned long expires;
+	long expires;
 	char file[255] = "/etc/udhcpd.leases";
 	struct lease_t lease;
 	struct in_addr addr;

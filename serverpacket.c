@@ -44,7 +44,7 @@ static int send_packet_to_relay(struct dhcpMessage *payload)
 /* send a packet to a specific arp address and ip address by creating our own ip packet */
 static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcast)
 {
-	char *chaddr;
+	unsigned char *chaddr;
 	u_int32_t ciaddr;
 	
 	if (force_broadcast) {
@@ -110,12 +110,13 @@ int sendOffer(struct dhcpMessage *oldpacket)
 	struct dhcpMessage packet;
 	struct dhcpOfferedAddr *lease = NULL;
 	u_int32_t req_align, lease_time_align = server_config.lease;
-	char *req, *lease_time;
+	unsigned char *req, *lease_time;
 	struct option_set *curr;
 	struct in_addr addr;
 
 	init_packet(&packet, oldpacket, DHCPOFFER);
 	
+	/* ADDME: if static, short circuit */
 	/* the client is in our lease/offered table */
 	if ((lease = find_lease_by_chaddr(oldpacket->chaddr))) {
 		if (!lease_expired(lease)) 
@@ -132,14 +133,14 @@ int sendOffer(struct dhcpMessage *oldpacket)
 		   ntohl(req_align) >= ntohl(server_config.start) &&
 		   ntohl(req_align) <= ntohl(server_config.end) &&
 		   
-		   /* and its not already taken/offered */
+		   /* and its not already taken/offered */ /* ADDME: check that its not a static lease */
 		   ((!(lease = find_lease_by_yiaddr(req_align)) ||
 		   
-		   /* or its taken, but expired */
+		   /* or its taken, but expired */ /* ADDME: or maybe in here */
 		   lease_expired(lease)))) {
-				packet.yiaddr = req_align;
+				packet.yiaddr = req_align; /* FIXME: oh my, is there a host using this IP? */
 
-	/* otherwise, find a free IP */
+	/* otherwise, find a free IP */ /*ADDME: is it a static lease? */
 	} else {
 		packet.yiaddr = find_address(0);
 		
@@ -167,7 +168,7 @@ int sendOffer(struct dhcpMessage *oldpacket)
 	/* Make sure we aren't just using the lease time from the previous offer */
 	if (lease_time_align < server_config.min_lease) 
 		lease_time_align = server_config.lease;
-		
+	/* ADDME: end of short circuit */		
 	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_align));
 
 	curr = server_config.options;
@@ -200,7 +201,7 @@ int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr)
 {
 	struct dhcpMessage packet;
 	struct option_set *curr;
-	char *lease_time;
+	unsigned char *lease_time;
 	u_int32_t lease_time_align = server_config.lease;
 	struct in_addr addr;
 
