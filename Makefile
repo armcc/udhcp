@@ -24,7 +24,7 @@ INSTALL = install
 VER := 0.9.6
 
 
-OBJS_SHARED = options.o socket.o packet.o
+OBJS_SHARED = options.o socket.o packet.o pidfile.o
 DHCPD_OBJS = dhcpd.o arpping.o files.o leases.o serverpacket.o
 DHCPC_OBJS = dhcpc.o clientpacket.o script.o
 

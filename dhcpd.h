@@ -117,7 +117,7 @@ struct server_config_t {
 	unsigned long offer_time; 	/* how long an offered address is reserved */
 	unsigned long min_lease; 	/* minimum lease a client can request*/
 	char *lease_file;
-	char *pid_file;
+	char *pidfile;
 	char *notify_file;		/* What to run whenever leases are written */
 	u_int32_t siaddr;		/* next server bootp option */
 	char *sname;			/* bootp server name */

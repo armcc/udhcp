@@ -44,13 +44,13 @@
 #include "script.h"
 #include "socket.h"
 #include "debug.h"
+#include "pidfile.h"
 
 static int state;
 static unsigned long requested_ip; /* = 0 */
 static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
-static int pid_fd;
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
@@ -133,45 +133,35 @@ static void release_requested(int sig)
 }
 
 
-static void pidfile_acquire(void)
+/* Exit and cleanup */
+static void exit_client(int retval)
 {
-	if (client_config.pidfile == NULL) return;
-
-	pid_fd = open(client_config.pidfile, O_CREAT | O_WRONLY, 0644);
-	if (pid_fd < 0) {
-		LOG(LOG_ERR, "Unable to open pidfile %s: %s\n",
-		    client_config.pidfile, strerror(errno));
-	} else {
-		lockf(pid_fd, F_LOCK, 0);
-	}
+	pidfile_delete(client_config.pidfile);
+	CLOSE_LOG();
+	exit(retval);
 }
 
 
-static void pidfile_write_release(void)
+/* SIGTERM handler */
+static void terminate(int sig)
 {
-	FILE *out;
-
-	if (client_config.pidfile == NULL || pid_fd < 0) return;
-
-	if ((out = fdopen(pid_fd, "w")) != NULL) {
-		fprintf(out, "%d\n", getpid());
-		fclose(out);
-	}
-	lockf(pid_fd, F_UNLCK, 0);
-	close(pid_fd);
+	sig = 0;
+	LOG(LOG_INFO, "Received SIGTERM");
+	exit_client(0);
 }
 
 
 static void background(void)
 {
+	int pid_fd;
 	if (client_config.quit_after_lease) {
-		exit(0);
+		exit_client(0);
 	} else if (!client_config.foreground) {
-		pidfile_acquire(); /* hold lock during fork. */
+		pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
 		switch(fork()) {
 		case -1:
 			perror("fork");
-			exit(1);
+			exit_client(1);
 			/*NOTREACHED*/
 		case 0:
 			break; /* child continues */
@@ -184,7 +174,7 @@ static void background(void)
 		close(2);
 		setsid();
 		client_config.foreground = 1; /* Do not fork again. */
-		pidfile_write_release();
+		pidfile_write_release(pid_fd);
 	}
 }
 
@@ -205,6 +195,7 @@ int main(int argc, char *argv[])
 	struct ifreq ifr;
 	struct dhcpMessage packet;
 	struct in_addr temp_addr;
+	int pid_fd;
 
 	static struct option options[] = {
 		{"clientid",	required_argument,	0, 'c'},
@@ -275,10 +266,10 @@ int main(int argc, char *argv[])
 	}
 
 	OPEN_LOG("udhcpc");
-	LOG(LOG_INFO, "Moreton Bay DHCP Client (v%s) started", VERSION);
+	LOG(LOG_INFO, "udhcp client (v%s) started", VERSION);
 
-	pidfile_acquire();
-	pidfile_write_release();
+	pid_fd = pidfile_acquire(client_config.pidfile);
+	pidfile_write_release(pid_fd);
 
 	if ((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
 		strcpy(ifr.ifr_name, client_config.interface);
@@ -287,7 +278,7 @@ int main(int argc, char *argv[])
 			client_config.ifindex = ifr.ifr_ifindex;
 		} else {
 			LOG(LOG_ERR, "SIOCGIFINDEX failed! %s", sys_errlist[errno]);
-			return 1;
+			exit_client(1);
 		}
 		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
 			memcpy(client_config.arp, ifr.ifr_hwaddr.sa_data, 6);
@@ -296,11 +287,11 @@ int main(int argc, char *argv[])
 				client_config.arp[3], client_config.arp[4], client_config.arp[5]);
 		} else {
 			LOG(LOG_ERR, "SIOCGIFHWADDR failed! %s", sys_errlist[errno]);
-			return 1;
+			exit_client(1);
 		}
 	} else {
 		LOG(LOG_ERR, "socket failed! %s", sys_errlist[errno]);
-		return 1;
+		exit_client(1);
 	}
 	close(fd);
 	fd = -1;
@@ -308,6 +299,7 @@ int main(int argc, char *argv[])
 	/* setup signal handlers */
 	signal(SIGUSR1, renew_requested);
 	signal(SIGUSR2, release_requested);
+	signal(SIGTERM, terminate);
 	
 	state = INIT_SELECTING;
 	run_script(NULL, "deconfig");
@@ -321,12 +313,12 @@ int main(int argc, char *argv[])
 		if (listen_mode == LISTEN_KERNEL) {
 			if ((fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface)) < 0) {
 				LOG(LOG_ERR, "couldn't create server socket -- au revoir");
-				exit(0);
+				exit_client(0);
 			}			
 		} else if (listen_mode == LISTEN_RAW) {
 			if ((fd = raw_socket(client_config.ifindex)) < 0) {
 				LOG(LOG_ERR, "couldn't create raw socket -- au revoir");
-				exit(0);
+				exit_client(0);
 			}			
 		} else fd = -1;
 
@@ -356,7 +348,7 @@ int main(int argc, char *argv[])
 					if (client_config.abort_if_no_lease) {
 						LOG(LOG_INFO,
 						    "No lease, failing.");
-						exit(1);
+						exit_client(1);
 				  	}
 					/* wait to try again */
 					packet_num = 0;

@@ -48,23 +48,31 @@
 #include "leases.h"
 #include "packet.h"
 #include "serverpacket.h"
-
-/* prototypes */
-static int log_pid(void);
+#include "pidfile.h"
 
 
 /* globals */
 struct dhcpOfferedAddr *leases;
 struct server_config_t server_config;
 
-static void udhcpd_killed(int pid)
+
+/* Exit and cleanup */
+static void exit_server(int retval)
 {
-	pid = 0;
-	if (server_config.pid_file) unlink(server_config.pid_file);
-	LOG(LOG_INFO, "Received SIGTERM");
+	pidfile_delete(server_config.pidfile);
 	CLOSE_LOG();
-	exit(0);
-}	
+	exit(retval);
+}
+
+
+/* SIGTERM handler */
+static void udhcpd_killed(int sig)
+{
+	sig = 0;
+	LOG(LOG_INFO, "Received SIGTERM");
+	exit_server(0);
+}
+
 
 #ifdef COMBINED_BINARY	
 int udhcpd(int argc, char *argv[])
@@ -84,6 +92,7 @@ int main(int argc, char *argv[])
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
 	struct sockaddr_in *sin;
+	int pid_fd;
 			
 	/* server ip addr */
 	int fd = -1;
@@ -92,8 +101,11 @@ int main(int argc, char *argv[])
 	argc = argv[0][0]; /* get rid of some warnings */
 	
 	OPEN_LOG("udhcpd");
-	LOG(LOG_INFO, "uDHCP Server (v%s) started", VERSION);
+	LOG(LOG_INFO, "udhcp server (v%s) started", VERSION);
 	
+	pid_fd = pidfile_acquire(server_config.pidfile);
+	pidfile_write_release(pid_fd);
+
 	memset(&server_config, 0, sizeof(struct server_config_t));
 	
 	read_config(DHCPD_CONF_FILE);
@@ -107,8 +119,6 @@ int main(int argc, char *argv[])
 	memset(leases, 0, sizeof(struct dhcpOfferedAddr) * server_config.max_leases);
 	read_leases(server_config.lease_file);
 
-	log_pid();
-	
 	if((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
 		ifr.ifr_addr.sa_family = AF_INET;
 		strcpy(ifr.ifr_name, server_config.interface);
@@ -118,14 +128,14 @@ int main(int argc, char *argv[])
 			DEBUG(LOG_INFO, "%s (server_ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
 		} else {
 			LOG(LOG_ERR, "SIOCGIFADDR failed!");
-			return 1;
+			exit_server(1);
 		}
 		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
 			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
 			server_config.ifindex = ifr.ifr_ifindex;
 		} else {
 			LOG(LOG_ERR, "SIOCGIFINDEX failed!");
-			return 1;
+			exit_server(1);
 		}
 		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
 			memcpy(server_config.arp, ifr.ifr_hwaddr.sa_data, 6);
@@ -134,20 +144,30 @@ int main(int argc, char *argv[])
 				server_config.arp[3], server_config.arp[4], server_config.arp[5]);
 		} else {
 			LOG(LOG_ERR, "SIOCGIFHWADDR failed!");
-			return 1;
+			exit_server(1);
 		}
 	} else {
 		LOG(LOG_ERR, "socket failed!");
-		return 1;
+		exit_server(1);
 	}
 	close(fd);
 
 #ifndef DEBUGGING
-	if (fork()) return 0;
-	else {
-		close(0);
-		setsid();
-	}
+	pid_fd = pidfile_acquire(server_config.pidfile); /* hold lock during fork. */
+	switch(fork()) {
+	case -1:
+		perror("fork");
+		exit_server(1);
+		/*NOTREACHED*/
+	case 0:
+		break; /* child continues */
+	default:
+		exit(0); /* parent exits */
+		/*NOTREACHED*/
+		}
+	close(0);
+	setsid();
+	pidfile_write_release(pid_fd);
 #endif
 
 
@@ -160,7 +180,7 @@ int main(int argc, char *argv[])
 		server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface);
 		if(server_socket == -1) {
 			LOG(LOG_ERR, "couldn't create server socket -- au revoir");
-			exit(0);
+			exit_server(0);
 		}			
 
 		FD_ZERO(&rfds);
@@ -262,20 +282,4 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-
-int log_pid(void) 
-{
-	int fd;
-	pid_t pid;
-	char *pidfile = server_config.pid_file;
-
-	pid = getpid();
-	if((fd = open(pidfile, O_WRONLY | O_CREAT, 0660)) < 0)
-		return -1;
-	write(fd, (void *) &pid, sizeof(pid));
-	close(fd);
-	return 0;
-}
-
 
