@@ -150,7 +150,7 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 {
 	char length = 0;
 	int i;
-	char option[2 + 4];
+	unsigned char option[2 + 4];
 	unsigned char *u8;
 	u_int16_t *u16;
 	u_int32_t *u32;
