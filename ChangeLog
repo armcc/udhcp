@@ -1,4 +1,6 @@
 0.9.3 (pending)
++ added hostname option to client (me)
++ fixed a strncpy bug in script.c (me)
 + fixed a leaky socket in dhcpc.c (me)
 + fixed a leaky socket in dhcpd.c (me)
 
