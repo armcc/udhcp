@@ -91,6 +91,7 @@
 #define MAC_BCAST_ADDR		"\xff\xff\xff\xff\xff\xff"
 #define OPT_CODE 0
 #define OPT_LEN 1
+#define OPT_DATA 2
 
 struct option_set {
 	unsigned char *data;

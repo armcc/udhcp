@@ -59,6 +59,7 @@ unsigned long random_xid(void)
 /* initialize a packet with the proper defaults */
 static void init_packet(struct dhcpMessage *packet, char type)
 {
+	unsigned char clientid[7];
 	struct vendor  {
 		char vendor, length;
 		char str[sizeof("udhcp "VERSION)];
@@ -66,7 +67,13 @@ static void init_packet(struct dhcpMessage *packet, char type)
 	
 	init_header(packet, type);
 	memcpy(packet->chaddr, client_config.arp, 6);
-	if (client_config.clientid) add_option_string(packet->options, client_config.clientid);
+	if (client_config.clientid) {
+		add_option_string(packet->options, client_config.clientid);
+	} else  {
+		clientid[0] = 1;
+		memcpy(clientid + 1, client_config.arp, 6);
+		add_option_string(packet->options, clientid);
+	}
 	if (client_config.hostname) add_option_string(packet->options, client_config.hostname);
 	add_option_string(packet->options, (char *) &vendor_id);
 }

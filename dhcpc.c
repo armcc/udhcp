@@ -226,7 +226,8 @@ int main(int argc, char *argv[])
 			client_config.clientid = malloc(len + 2);
 			client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
 			client_config.clientid[OPT_LEN] = len;
-			strncpy(client_config.clientid + 2, optarg, len);
+			client_config.clientid[OPT_DATA] = '\0';
+			strncpy(client_config.clientid + 3, optarg, len - 1);
 			break;
 		case 'f':
 			client_config.foreground = 1;
