@@ -1,3 +1,9 @@
+0.9.5 (010914)
++ Fixed $HOME and $PATH env passing (me)
++ Fixed client to only listen for raw packets on correct interface (me)
++ added --quit,-q option to quit after a lease is obtained (me)
++ Fixed 100% CPU utilization by client when interface is down (me)
+
 0.9.4 (010827)
 + Force broadcast to broken clients that request unicast (ie, MSFT 98)
 + Make install rules (Adam J. Richter <adam@yggdrasil.com>)

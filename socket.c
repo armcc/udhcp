@@ -83,18 +83,21 @@ int listen_socket(unsigned int ip, int port, char *inf)
 }
 
 
-int raw_socket(char *inf)
+int raw_socket(int ifindex)
 {
 	int fd;
-	struct ifreq interface;
+	struct sockaddr_ll sock;
 
 	if ((fd = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP))) < 0) {
 		DEBUG(LOG_ERR, "socket call failed: %s", sys_errlist[errno]);
 		return -1;
 	}
 	
-	strncpy(interface.ifr_ifrn.ifrn_name, inf, IFNAMSIZ);
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE,(char *)&interface, sizeof(interface)) < 0) {
+	sock.sll_family = AF_PACKET;
+	sock.sll_protocol = htons(ETH_P_IP);
+	sock.sll_ifindex = ifindex;
+	if (bind(fd, (struct sockaddr *) &sock, sizeof(sock)) < 0) {
+		DEBUG(LOG_ERR, "bind call failed: %s", sys_errlist[errno]);
 		close(fd);
 		return -1;
 	}

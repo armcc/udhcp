@@ -53,13 +53,17 @@ The udhcp client negotiates a lease with the DHCP server and notifies
 a set of scripts when a leases is obtained or lost. The command line
 options for the udhcp client are:
 
--d, --dir=PATH                  Path containing DHCP client scripts 
-					(default: /etc/udhcpc/)
--p, --prefix=PREFIX             Prefix to add to scripts (default: none)
--i, --interface=INTERFACE       Interface to use (default: eth0)
--r, --request=IP                IP address to request (default: none)
 -c, --clientid=CLIENTID         Client identifier
 -H, --hostname=HOSTNAME         Client hostname
+-f, --foreground                Do not fork after getting lease
+-i, --interface=INTERFACE       Interface to use (default: eth0)
+-n, --now                       Exit with failure if lease cannot be
+                                immediately negotiated.
+-p, --pidfile=file              Store process ID of daemon in file
+-q, --quit                      Quit after obtaining lease
+-r, --request=IP                IP address to request (default: none)
+-s, --script=file               Run file at dhcp events (default:
+                                /usr/share/udhcpc/default.script)
 -v, --version                   Display version
 
 If the requested IP address cannot be obtained, the client accepts the
@@ -88,6 +92,8 @@ are:
 
 The paramaters for enviromental variables are as follows:
 
+	$HOME		- The set $HOME env or "/"
+	$PATH		- the set $PATH env or "/bin:/usr/bin:/sbin:/usr/sbin"
 	$1		- What action the script should perform
 	interface	- The interface this was obtained on
 	ip		- The obtained IP

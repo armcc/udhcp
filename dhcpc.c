@@ -63,6 +63,7 @@ struct client_config_t client_config = {
 	/* Default options. */
 	abort_if_no_lease: 0,
 	foreground: 0,
+	quit_after_lease: 0,
 	interface: "eth0",
 	pidfile: NULL,
 	script: DEFAULT_SCRIPT,
@@ -83,6 +84,7 @@ static void print_usage(void)
 "  -n, --now                       Exit with failure if lease cannot be\n"
 "                                  immediately negotiated.\n"
 "  -p, --pidfile=file              Store process ID of daemon in file\n"
+"  -q, --quit                      Quit after obtaining lease\n"
 "  -r, --request=IP                IP address to request (default: none)\n"
 "  -s, --script=file               Run file at dhcp events (default:\n"
 "                                  " DEFAULT_SCRIPT ")\n"
@@ -162,7 +164,9 @@ static void pidfile_write_release(void)
 
 static void background(void)
 {
-	if (!client_config.foreground) {
+	if (client_config.quit_after_lease) {
+		exit(0);
+	} else if (!client_config.foreground) {
 		pidfile_acquire(); /* hold lock during fork. */
 		switch(fork()) {
 		case -1:
@@ -210,6 +214,7 @@ int main(int argc, char *argv[])
 		{"interface",	required_argument,	0, 'i'},
 		{"now", 	no_argument,		0, 'n'},
 		{"pidfile",	required_argument,	0, 'p'},
+		{"quit",	no_argument,		0, 'q'},
 		{"request",	required_argument,	0, 'r'},
 		{"script",	required_argument,	0, 's'},
 		{"version",	no_argument,		0, 'v'},
@@ -219,7 +224,7 @@ int main(int argc, char *argv[])
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:fH:hi:np:r:s:v", options, &option_index);
+		c = getopt_long(argc, argv, "c:fH:hi:np:qr:s:v", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
@@ -253,6 +258,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			client_config.pidfile = optarg;
+			break;
+		case 'q':
+			client_config.quit_after_lease = 1;
 			break;
 		case 'r':
 			requested_ip = inet_addr(optarg);
@@ -316,7 +324,7 @@ int main(int argc, char *argv[])
 				exit(0);
 			}			
 		} else if (listen_mode == LISTEN_RAW) {
-			if ((fd = raw_socket(client_config.interface)) < 0) {
+			if ((fd = raw_socket(client_config.ifindex)) < 0) {
 				LOG(LOG_ERR, "couldn't create raw socket -- au revoir");
 				exit(0);
 			}			
@@ -418,7 +426,7 @@ int main(int argc, char *argv[])
 				timeout = 0xffffffff;
 				break;
 			}
-		} else if (listen_mode != LISTEN_NONE && FD_ISSET(fd, &rfds)) {
+		} else if (retval > 0 && listen_mode != LISTEN_NONE && FD_ISSET(fd, &rfds)) {
 			/* a packet is ready, read it */
 			
 			if (listen_mode == LISTEN_KERNEL) {

@@ -137,6 +137,20 @@ static void fill_options(char *dest, unsigned char *option, struct dhcp_option *
 }
 
 
+static char *find_env(const char *prefix, char *defaultstr)
+{
+	extern char **environ;
+	char **ptr;
+	const int len = strlen(prefix);
+
+	for (ptr = environ; *ptr != NULL; ptr++) {
+		if (strncmp(prefix, *ptr, len) == 0)
+		return *ptr;
+	}
+	return defaultstr;
+}
+
+
 /* put all the paramaters into an environment */
 static char **fill_envp(struct dhcpMessage *packet)
 {
@@ -156,9 +170,9 @@ static char **fill_envp(struct dhcpMessage *packet)
 	envp = malloc((num_options + 5) * sizeof(char *));
 	envp[0] = malloc(strlen("interface=") + strlen(client_config.interface) + 1);
 	sprintf(envp[0], "interface=%s", client_config.interface);
-	envp[1] = malloc(strlen("ip=255.255.255.255"));
-	envp[2] = getenv("PATH") ? getenv("PATH") : "PATH=/bin:/usr/bin:/sbin:/usr/sbin";
-	envp[3] = getenv("HOME") ? getenv("HOME") : "HOME=/";
+	envp[1] = malloc(sizeof("ip=255.255.255.255"));
+	envp[2] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
+	envp[3] = find_env("HOME", "HOME=/");
 
 	if (packet == NULL) {
 		envp[4] = NULL;
@@ -166,8 +180,8 @@ static char **fill_envp(struct dhcpMessage *packet)
 	}
 
 	addr = (unsigned char*) &packet->yiaddr;
-	sprintf (envp[1], "ip=%d.%d.%d.%d",
-		 addr[0], addr[1], addr[2], addr[3]);
+	sprintf(envp[1], "ip=%d.%d.%d.%d",
+		addr[0], addr[1], addr[2], addr[3]);
 	for (i = 0, j = 4; options[i].code; i++) {
 		if ((temp = get_option(packet, options[i].code))) {
 			envp[j] = malloc(max_option_length(temp, &options[i]) + 
