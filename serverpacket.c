@@ -129,12 +129,11 @@ int sendOffer(struct dhcpMessage *oldpacket)
 		   ntohl(req_align) <= ntohl(server_config.end) &&
 		   
 		   /* and its not already taken/offered */
-		   ((!(lease = find_lease_by_yiaddr(*req)) ||
+		   ((!(lease = find_lease_by_yiaddr(req_align)) ||
 		   
 		   /* or its taken, but expired */
 		   lease_expired(lease)))) {
-		   
-				packet.yiaddr = *req;
+				packet.yiaddr = req_align;
 
 	/* otherwise, find a free IP */
 	} else {
