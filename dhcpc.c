@@ -342,7 +342,7 @@ int main(int argc, char *argv[])
 					/* send discover packet */
 					send_discover(xid, requested_ip); /* broadcast */
 					
-					timeout = now + ((packet_num == 2) ? 10 : 2);
+					timeout = now + ((packet_num == 2) ? 4 : 2);
 					packet_num++;
 				} else {
 					if (client_config.background_if_no_lease) {
