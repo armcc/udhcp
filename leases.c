@@ -27,7 +27,7 @@ void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr)
 	
 	for (i = 0; i < server_config.max_leases; i++)
 		if ((j != 16 && !memcmp(leases[i].chaddr, chaddr, 16)) ||
-		    (!yiaddr && leases[i].yiaddr == yiaddr)) {
+		    (yiaddr && leases[i].yiaddr == yiaddr)) {
 			memset(&(leases[i]), 0, sizeof(struct dhcpOfferedAddr));
 		}
 }
