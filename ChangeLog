@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ Fix clear_lease logic (me)
 + -h is now an alias for -H (udhcp bug #1253)
 + Shorter timeout on not receiving offers (me)
 + Improved signal behavior by client (me)
