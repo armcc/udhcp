@@ -4,6 +4,7 @@
 + Accept packets without a UDP checksum (me)
 + Accept packets with extra garbage (me)
 + Better error handling in files.c (me)
++ Combined read_interface function to reduce COMBINED_BINARY size (me)
 
 0.9.6 (011001)
 + Added bootp paramaters to server (me)

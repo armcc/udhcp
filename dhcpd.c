@@ -119,38 +119,9 @@ int main(int argc, char *argv[])
 	memset(leases, 0, sizeof(struct dhcpOfferedAddr) * server_config.max_leases);
 	read_leases(server_config.lease_file);
 
-	if((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
-		ifr.ifr_addr.sa_family = AF_INET;
-		strcpy(ifr.ifr_name, server_config.interface);
-		if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
-			sin = (struct sockaddr_in *) &ifr.ifr_addr;
-			server_config.server = sin->sin_addr.s_addr;
-			DEBUG(LOG_INFO, "%s (server_ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
-		} else {
-			LOG(LOG_ERR, "SIOCGIFADDR failed!");
-			exit_server(1);
-		}
-		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
-			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
-			server_config.ifindex = ifr.ifr_ifindex;
-		} else {
-			LOG(LOG_ERR, "SIOCGIFINDEX failed!");
-			exit_server(1);
-		}
-		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
-			memcpy(server_config.arp, ifr.ifr_hwaddr.sa_data, 6);
-			DEBUG(LOG_INFO, "adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
-				server_config.arp[0], server_config.arp[1], server_config.arp[2], 
-				server_config.arp[3], server_config.arp[4], server_config.arp[5]);
-		} else {
-			LOG(LOG_ERR, "SIOCGIFHWADDR failed!");
-			exit_server(1);
-		}
-	} else {
-		LOG(LOG_ERR, "socket failed!");
+	if (read_interface(server_config.interface, &server_config.ifindex,
+			   &server_config.server, server_config.arp) < 0)
 		exit_server(1);
-	}
-	close(fd);
 
 #ifndef DEBUGGING
 	pid_fd = pidfile_acquire(server_config.pidfile); /* hold lock during fork. */

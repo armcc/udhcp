@@ -271,30 +271,9 @@ int main(int argc, char *argv[])
 	pid_fd = pidfile_acquire(client_config.pidfile);
 	pidfile_write_release(pid_fd);
 
-	if ((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
-		strcpy(ifr.ifr_name, client_config.interface);
-		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
-			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
-			client_config.ifindex = ifr.ifr_ifindex;
-		} else {
-			LOG(LOG_ERR, "SIOCGIFINDEX failed! %s", sys_errlist[errno]);
-			exit_client(1);
-		}
-		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
-			memcpy(client_config.arp, ifr.ifr_hwaddr.sa_data, 6);
-			DEBUG(LOG_INFO, "adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
-				client_config.arp[0], client_config.arp[1], client_config.arp[2], 
-				client_config.arp[3], client_config.arp[4], client_config.arp[5]);
-		} else {
-			LOG(LOG_ERR, "SIOCGIFHWADDR failed! %s", sys_errlist[errno]);
-			exit_client(1);
-		}
-	} else {
-		LOG(LOG_ERR, "socket failed! %s", sys_errlist[errno]);
+	if (read_interface(client_config.interface, &client_config.ifindex, 
+			   NULL, client_config.arp) < 0)
 		exit_client(1);
-	}
-	close(fd);
-	fd = -1;
 
 	/* setup signal handlers */
 	signal(SIGUSR1, renew_requested);

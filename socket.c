@@ -24,6 +24,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <string.h>
@@ -39,8 +40,53 @@
 #include <linux/if_ether.h>
 #endif
 
-
 #include "debug.h"
+
+int read_interface(char *interface, int *ifindex, unsigned long *addr, char *arp)
+{
+	int fd, aliased;
+	struct ifreq ifr;
+	struct sockaddr_in *sin;
+
+	memset(&ifr, 0, sizeof(struct ifreq));
+	if((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
+		ifr.ifr_addr.sa_family = AF_INET;
+		strcpy(ifr.ifr_name, interface);
+
+		if (addr) { 
+			if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
+				sin = (struct sockaddr_in *) &ifr.ifr_addr;
+				*addr = sin->sin_addr.s_addr;
+				DEBUG(LOG_INFO, "%s (our ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
+			} else {
+				LOG(LOG_ERR, "SIOCGIFADDR failed!: %s", sys_errlist[errno]);
+				return -1;
+			}
+		}
+		
+		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
+			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
+			*ifindex = ifr.ifr_ifindex;
+		} else {
+			LOG(LOG_ERR, "SIOCGIFINDEX failed!: %s", sys_errlist[errno]);
+			return -1;
+		}
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
+			memcpy(arp, ifr.ifr_hwaddr.sa_data, 6);
+			DEBUG(LOG_INFO, "adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
+				arp[0], arp[1], arp[2], arp[3], arp[4], arp[5]);
+		} else {
+			LOG(LOG_ERR, "SIOCGIFHWADDR failed!: %s", sys_errlist[errno]);
+			return -1;
+		}
+	} else {
+		LOG(LOG_ERR, "socket failed!: %s", sys_errlist[errno]);
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
 
 int listen_socket(unsigned int ip, int port, char *inf)
 {
