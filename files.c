@@ -19,7 +19,7 @@
 #include "leases.h"
 
 /* on these functions, make sure you datatype matches */
-static int read_ip(char *line, void *arg)
+static int read_ip(const char *line, void *arg)
 {
 	struct in_addr *addr = arg;
 	struct hostent *host;
@@ -34,7 +34,7 @@ static int read_ip(char *line, void *arg)
 }
 
 
-static int read_str(char *line, void *arg)
+static int read_str(const char *line, void *arg)
 {
 	char **dest = arg;
 	
@@ -45,7 +45,7 @@ static int read_str(char *line, void *arg)
 }
 
 
-static int read_u32(char *line, void *arg)
+static int read_u32(const char *line, void *arg)
 {
 	u_int32_t *dest = arg;
 	char *endptr;
@@ -54,7 +54,7 @@ static int read_u32(char *line, void *arg)
 }
 
 
-static int read_yn(char *line, void *arg)
+static int read_yn(const char *line, void *arg)
 {
 	char *dest = arg;
 	int retval = 1;
@@ -174,14 +174,14 @@ static struct config_keyword keywords[] = {
 };
 
 
-int read_config(char *file)
+int read_config(const char *file)
 {
 	FILE *in;
 	char buffer[80], orig[80], *token, *line;
 	int i;
 
-	for (i = 0; strlen(keywords[i].keyword); i++)
-		if (strlen(keywords[i].def))
+	for (i = 0; keywords[i].keyword[0]; i++)
+		if (keywords[i].def[0])
 			keywords[i].handler(keywords[i].def, keywords[i].var);
 
 	if (!(in = fopen(file, "r"))) {
@@ -206,7 +206,7 @@ int read_config(char *file)
 		for (i = strlen(line); i > 0 && isspace(line[i - 1]); i--);
 		line[i] = '\0';
 		
-		for (i = 0; strlen(keywords[i].keyword); i++)
+		for (i = 0; keywords[i].keyword[0]; i++)
 			if (!strcasecmp(token, keywords[i].keyword))
 				if (!keywords[i].handler(line, keywords[i].var)) {
 					LOG(LOG_ERR, "unable to parse '%s'", orig);
@@ -225,7 +225,7 @@ void write_leases(void)
 	unsigned int i;
 	char buf[255];
 	time_t curr = time(0);
-	unsigned long lease_time;
+	unsigned long tmp_time;
 	
 	if (!(fp = fopen(server_config.lease_file, "w"))) {
 		LOG(LOG_ERR, "Unable to open %s for writing", server_config.lease_file);
@@ -234,15 +234,20 @@ void write_leases(void)
 	
 	for (i = 0; i < server_config.max_leases; i++) {
 		if (leases[i].yiaddr != 0) {
+
+			/* screw with the time in the struct, for easier writing */
+			tmp_time = leases[i].expires;
+
 			if (server_config.remaining) {
 				if (lease_expired(&(leases[i])))
-					lease_time = 0;
-				else lease_time = leases[i].expires - curr;
-			} else lease_time = leases[i].expires;
-			lease_time = htonl(lease_time);
-			fwrite(leases[i].chaddr, 16, 1, fp);
-			fwrite(&(leases[i].yiaddr), 4, 1, fp);
-			fwrite(&lease_time, 4, 1, fp);
+					leases[i].expires = 0;
+				else leases[i].expires -= curr;
+			} /* else stick with the time we got */
+			leases[i].expires = htonl(leases[i].expires);
+			fwrite(&leases[i], sizeof(struct dhcpOfferedAddr), 1, fp);
+
+			/* Then restore it when done. */
+			leases[i].expires = tmp_time;
 		}
 	}
 	fclose(fp);
@@ -254,7 +259,7 @@ void write_leases(void)
 }
 
 
-void read_leases(char *file)
+void read_leases(const char *file)
 {
 	FILE *fp;
 	unsigned int i = 0;
@@ -280,5 +285,3 @@ void read_leases(char *file)
 	DEBUG(LOG_INFO, "Read %d leases", i);
 	fclose(fp);
 }
-		
-		
