@@ -31,6 +31,7 @@
  *		-1 error 
  */  
 
+/* FIXME: match response against chaddr */
 int arpping(u_int32_t yiaddr, u_int32_t ip, char *mac, char *interface)
 {
 
@@ -57,7 +58,7 @@ int arpping(u_int32_t yiaddr, u_int32_t ip, char *mac, char *interface)
 	}
 
 	/* send arp request */
-	bzero(&arp, sizeof(arp));
+	memset(&arp, 0, sizeof(arp));
 	memcpy(arp.ethhdr.h_dest, MAC_BCAST_ADDR, 6);	/* MAC DA */
 	memcpy(arp.ethhdr.h_source, mac, 6);		/* MAC SA */
 	arp.ethhdr.h_proto = htons(ETH_P_ARP);		/* protocol type (Ethernet) */
@@ -70,7 +71,7 @@ int arpping(u_int32_t yiaddr, u_int32_t ip, char *mac, char *interface)
 	memcpy(arp.sHaddr, mac, 6);			/* source hardware address */
 	*((u_int *) arp.tInaddr) = yiaddr;		/* target IP address */
 	
-	bzero(&addr, sizeof(addr));
+	memset(&addr, 0, sizeof(addr));
 	strcpy(addr.sa_data, interface);
 	if (sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0)
 		rv = 0;
