@@ -21,7 +21,7 @@ CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 INSTALL = install
 
-VER := 0.9.8-pre
+VER := 0.9.8
 
 
 OBJS_SHARED = options.o socket.o packet.o pidfile.o

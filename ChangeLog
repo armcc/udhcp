@@ -1,4 +1,4 @@
-0.9.8 (pending)
+0.9.8 (021031)
 + split up README files (me)
 + use /dev/urandom to seed xid's (instead of time(0)) (me)
 + fixed renew behavior (me)
