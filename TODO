@@ -3,7 +3,7 @@ TODO
 + fix aliasing (ie: eth0:0)
 + DONE: Make sure get_raw_packet only accepts packets on the specified interface
 + better standard linux distro support
-+ make config file a command line option for server
++ DONE: make config file a command line option for server
 + IMPLEMENTED: make forking a command line option
 + make sure packet generation works on a wide varitey of arches
 + Interoperability testing

@@ -99,7 +99,10 @@ int main(int argc, char *argv[])
 
 	memset(&server_config, 0, sizeof(struct server_config_t));
 	
-	read_config(DHCPD_CONF_FILE);
+	if (argc < 2)
+		read_config(DHCPD_CONF_FILE);
+	else read_config(argv[1]);
+
 	pid_fd = pidfile_acquire(server_config.pidfile);
 	pidfile_write_release(pid_fd);
 
@@ -119,19 +122,10 @@ int main(int argc, char *argv[])
 
 #ifndef DEBUGGING
 	pid_fd = pidfile_acquire(server_config.pidfile); /* hold lock during fork. */
-	switch(fork()) {
-	case -1:
+	if (daemon(0, 0) == -1) {
 		perror("fork");
 		exit_server(1);
-		/*NOTREACHED*/
-	case 0:
-		break; /* child continues */
-	default:
-		exit(0); /* parent exits */
-		/*NOTREACHED*/
-		}
-	close(0);
-	setsid();
+	}
 	pidfile_write_release(pid_fd);
 #endif
 

@@ -158,21 +158,10 @@ static void background(void)
 		exit_client(0);
 	} else if (!client_config.foreground) {
 		pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
-		switch(fork()) {
-		case -1:
+		if (daemon(0, 0) == -1) {
 			perror("fork");
 			exit_client(1);
-			/*NOTREACHED*/
-		case 0:
-			break; /* child continues */
-		default:
-			exit(0); /* parent exits */
-			/*NOTREACHED*/
 		}
-		close(0);
-		close(1);
-		close(2);
-		setsid();
 		client_config.foreground = 1; /* Do not fork again. */
 		pidfile_write_release(pid_fd);
 	}

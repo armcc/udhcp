@@ -8,6 +8,12 @@ compliant.
 udhcp server (udhcpd)
 --------------------
 
+The only command line argument to udhcpd is an optional specifed
+config file. If no config file is specified, udhcpd uses the default
+config file, /etc/udhcpd.conf. Ex:
+
+udhcpd /etc/udhcpd.eth1.conf
+
 The udhcp server employs a number of simple config files:
 
 udhcpd.leased
@@ -152,7 +158,7 @@ dhcpd.h contains the other two compile time options:
 	LEASE_TIME: The default lease time if not specified in the config
 	file.
 	
-	DHCPD_CONFIG_FILE: What config file to use.
+	DHCPD_CONFIG_FILE: The defualt config file to use.
 	
 	
 

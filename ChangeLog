@@ -1,4 +1,6 @@
 0.9.7 (pending)
++ Change fork/close/setsid structures to daemon() (me)
++ Allow user to specify udhcpd config file at run time (Steven, me)
 + Write pidfile after changing it (Steven CTR Carr <Steven.CTR.Carr@tc.faa.gov>)
 + Added env var docs to udhcpc man page (Matt)
 + Standardized lowercase udhcp in documentation (me)
