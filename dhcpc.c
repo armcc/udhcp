@@ -51,7 +51,7 @@ static unsigned long requested_ip; /* = 0 */
 static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
-static int fd;
+static int fd = -1;
 static int signal_pipe[2];
 
 #define LISTEN_NONE 0
@@ -109,7 +109,7 @@ static void change_mode(int new_mode)
 {
 	DEBUG(LOG_INFO, "entering %s listen mode",
 		new_mode ? (new_mode == 1 ? "kernel" : "raw") : "none");
-	close(fd);
+	if (fd >= 0) close(fd);
 	fd = -1;
 	listen_mode = new_mode;
 }
