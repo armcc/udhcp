@@ -1,8 +1,12 @@
+0.9.7 (pending)
++ Added env var docs to udhcpc man page (Matt)
++ Standardized lowercase udhcp in documentation (me)
+
 0.9.6 (011001)
 + Added bootp paramaters to server (me)
 + Added bootp paramaters to client (me)
 + Added vendor id to client (me)
-+ Better pdfile handling in client and server (me)
++ Better pidfile handling in client and server (me)
 + Added man pages (Matt Kraai <kraai@alumni.carnegiemellon.edu>)
 
 0.9.5 (010914)

@@ -61,8 +61,8 @@ static void init_packet(struct dhcpMessage *packet, char type)
 {
 	struct vendor  {
 		char vendor, length;
-		char str[sizeof("uDHCP "VERSION)];
-	} vendor_id = { DHCP_VENDOR,  sizeof("uDHCP "VERSION) - 1, "uDHCP "VERSION};
+		char str[sizeof("udhcp "VERSION)];
+	} vendor_id = { DHCP_VENDOR,  sizeof("udhcp "VERSION) - 1, "udhcp "VERSION};
 	
 	memset(packet, 0, sizeof(struct dhcpMessage));
 	
