@@ -1,3 +1,6 @@
+0.9.4 (pending)
++ Force broadcast to broken clients that request unicast (ie, MSFT 98)
+
 0.9.3 (010820)
 + Increased debugging verbosity (me)
 + Cut trailing whitespace when reading config file (me)
