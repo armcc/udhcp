@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ Improve signal handling (David Poole)
 + Fix to config file parsing (Matt Kraai)
 + Fix load lease logic (me)
 + Fix clear_lease logic (me)

@@ -52,6 +52,9 @@ static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
 static int fd;
+static int renew_requested; /* = 0 */
+static int release_requested; /* = 0 */
+static int term_received; /* = 0 */
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
@@ -109,11 +112,10 @@ static void change_mode(int new_mode)
 }
 
 
-/* SIGUSR1 handler (renew) */
-static void renew_requested(int sig)
+/* perform a renew */
+static void perform_renew(void)
 {
-	sig = 0;
-	LOG(LOG_INFO, "Received SIGUSR1");
+	LOG(LOG_INFO, "Performing a DHCP renew");
 	switch (state) {
 	case RENEWING:
 		run_script(NULL, "deconfig");
@@ -139,16 +141,23 @@ static void renew_requested(int sig)
 }
 
 
-/* SIGUSR2 handler (release) */
-static void release_requested(int sig)
+/* perform a release */
+static void perform_release(void)
 {
-	sig = 0;
-	LOG(LOG_INFO, "Received SIGUSR2");
+	char buffer[16];
+	struct in_addr temp_addr;
+
 	/* send release packet */
 	if (state == BOUND || state == RENEWING || state == REBINDING) {
+		temp_addr.s_addr = server_addr;
+		sprintf(buffer, "%s", inet_ntoa(temp_addr));
+		temp_addr.s_addr = requested_ip;
+		LOG(LOG_INFO, "Unicasting a release of %s to %s", 
+				inet_ntoa(temp_addr), buffer);
 		send_release(server_addr, requested_ip); /* unicast */
 		run_script(NULL, "deconfig");
 	}
+	LOG(LOG_INFO, "Entering released state");
 
 	change_mode(LISTEN_NONE);
 	state = RELEASED;
@@ -165,12 +174,14 @@ static void exit_client(int retval)
 }
 
 
-/* SIGTERM handler */
-static void terminate(int sig)
+/* Signal handler */
+static void signal_handler(int sig)
 {
-	sig = 0;
-	LOG(LOG_INFO, "Received SIGTERM");
-	exit_client(0);
+	switch (sig) {
+	case SIGUSR1: renew_requested = 1; break;
+	case SIGUSR2: release_requested = 1; break;
+	case SIGTERM: term_received = 1; break;
+	}
 }
 
 
@@ -302,9 +313,9 @@ int main(int argc, char *argv[])
 	}
 
 	/* setup signal handlers */
-	signal(SIGUSR1, renew_requested);
-	signal(SIGUSR2, release_requested);
-	signal(SIGTERM, terminate);
+	signal(SIGUSR1, signal_handler);
+	signal(SIGUSR2, signal_handler);
+	signal(SIGTERM, signal_handler);
 	
 	state = INIT_SELECTING;
 	run_script(NULL, "deconfig");
@@ -516,7 +527,18 @@ int main(int argc, char *argv[])
 			}					
 		} else if (retval == -1 && errno == EINTR) {
 			/* a signal was caught */
-			
+			if (release_requested) {
+				perform_release();
+				release_requested = 0;
+			}
+			if (renew_requested) {
+				perform_renew();
+				renew_requested = 0;
+			}
+			if (term_received) {
+				LOG(LOG_INFO, "Received SIGTERM");
+				exit_client(0);
+			}			
 		} else {
 			/* An error occured */
 			DEBUG(LOG_ERR, "Error on select");
