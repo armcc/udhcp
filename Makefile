@@ -92,6 +92,12 @@ endif
 		$(INSTALL) samples/sample.$$name \
 			$(USRSHAREDIR)/udhcpc/default.$$name ; \
 	done
+	mkdir -p $(USRSHAREDIR)/man/man1
+	$(INSTALL) dumpleases.1 $(USRSHAREDIR)/man/man1
+	mkdir -p $(USRSHAREDIR)/man/man5
+	$(INSTALL) udhcpd.conf.5 $(USRSHAREDIR)/man/man5
+	mkdir -p $(USRSHAREDIR)/man/man8
+	$(INSTALL) udhcpc.8 udhcpd.8 $(USRSHAREDIR)/man/man8
 
 clean:
 	-rm -f udhcpd udhcpc dumpleases *.o core
