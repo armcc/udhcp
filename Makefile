@@ -21,9 +21,6 @@ CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 INSTALL = install
 
-VER := 0.9.8
-
-
 OBJS_SHARED = options.o socket.o packet.o pidfile.o
 DHCPD_OBJS = dhcpd.o arpping.o files.o leases.o serverpacket.o
 DHCPC_OBJS = dhcpc.o clientpacket.o script.o
@@ -51,7 +48,7 @@ ifdef SYSLOG
 CFLAGS += -DSYSLOG
 endif
 
-CFLAGS += -W -Wall -Wstrict-prototypes -DVERSION='"$(VER)"'
+CFLAGS += -W -Wall -Wstrict-prototypes
 
 ifdef DEBUG
 CFLAGS += -g -DDEBUG
