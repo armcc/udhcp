@@ -58,7 +58,7 @@ static int calc_length(struct dhcpMessage *payload)
 }
 
 
-static u_int16_t checksum(void *addr, int count)
+u_int16_t checksum(void *addr, int count)
 {
 	/* Compute Internet Checksum for "count" bytes
 	 *         beginning at location "addr".
