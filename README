@@ -1,11 +1,14 @@
-Moreton Bay Server README
+udhcp server/client package readme
 -------------------------
 
-The Moreton Bay DHCP Server is designed deliberately to be a small,
-lean, DHCP server. It does however, strive to be a fully functional,
-and compliant server.
+The udhcp server/client package is primarily geared towards embedded
+systems. It does however, strive to be fully functional, and RFC
+compliant.
 
-The Moreton Bay DHCP Server employs a number of simple config files:
+udhcp server (udhcpd)
+--------------------
+
+The udhcp server employs a number of simple config files:
 
 udhcpd.leased
 ------------
@@ -62,30 +65,30 @@ options for the udhcp client are:
 If the requested IP address cannot be obtained, the client accepts the
 address that the server offers.
 
-When an event occurs, udhcpc calls one one of the scripts. The scripts
-aro by default contained in /etc/udhcpc/ but this can be changed via the
-command line arguments. The three scripts that are called are:
+When an event occurs, udhcpc calls the action script. The script by
+default is /usr/share/udhcpc/default.script but this can be changed via 
+the command line arguments. The three possible arguments to the script 
+are:
 
-	<prefix>deconfig: This script is called when udhcpc starts, and
+	deconfig: This argument is used when udhcpc starts, and
 	when a leases is lost. The script should put the interface in an
 	up, but deconfigured state, ie: ifconfig $interface 0.0.0.0.
 	
-	<prefix>bound: This script is called when udhcpc moves from an
+	bound: This argument is used when udhcpc moves from an
 	unbound, to a bound state. All of the paramaters are set in
-	enviromental variables, as well as written to a file, 
-	<dir>/<prefix>info (ie, /etc/udhcpc/ext.info). This script should
-	configure the interface, and set any other relavent parameter
-	(default gateway, dns server, etc).
+	enviromental variables, The script should configure the interface,
+	and set any other relavent parameters (default gateway, dns server, 
+	etc).
 	
-	<prefix>renew: This script is called when a DHCP lease is renewed.
-	All of the paramaters are set in enviromental variables, as well
-	as written to the info file. This is called when the interface is
-	already configured, so the ip address will not change, however,
-	the other DHCP paramaters, such as the default gateway, subnet mask,
-	and dns server may change.
+	renew: This argument is used when a DHCP lease is renewed. All of
+	the paramaters are set in enviromental variables. This argument is
+	used when the interface is already configured, so the IP address,
+	will not change, however, the other DHCP paramaters, such as the
+	default gateway, subnet mask, and dns server may change.
 
-The paramaters for the config file and enviromental variables are as follows:
+The paramaters for enviromental variables are as follows:
 
+	$1		- What action the script should perform
 	interface	- The interface this was obtained on
 	ip		- The obtained IP
 	subnet		- The assigend subnet mask
@@ -143,7 +146,4 @@ dhcpd.h contains the other two compile time options:
 	DHCPD_CONFIG_FILE: What config file to use.
 	
 	
-
-Have fun!
--Moreton Bay DHCP Server development team.
 

@@ -24,9 +24,11 @@
 
 
 struct client_config_t {
-	char *dir;			/* Path containing DHCP client scripts */
-	char *prefix;			/* Prefix to add to scripts */
-	char interface[10];		/* The name of the interface to use */
+	char foreground;		/* Do not fork */
+	char abort_if_no_lease;		/* Abort if no lease */
+	char *interface;		/* The name of the interface to use */
+	char *pidfile;			/* Optionally store the process ID */
+	char *script;			/* User script to run at dhcp events */
 	char *clientid;			/* Optional client id to use */
 	char *hostname;			/* Optional hostname to use */
 	int ifindex;			/* Index number of the interface to use */

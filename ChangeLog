@@ -1,5 +1,10 @@
-0.9.4 (pending)
+0.9.4 (010827)
 + Force broadcast to broken clients that request unicast (ie, MSFT 98)
++ Make install rules (Adam J. Richter <adam@yggdrasil.com>)
++ One scripts, instead of many (Adam)
++ Removed script paramater info files (env vars only) (Adam)
++ Controlling of forking behavior in client (Adam)
++ General script.c/dhcpc.c cleanups (Adam)
 
 0.9.3 (010820)
 + Increased debugging verbosity (me)

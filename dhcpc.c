@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <stdlib.h>
@@ -45,36 +46,55 @@
 #include "debug.h"
 
 static int state;
-static unsigned long requested_ip = 0;
+static unsigned long requested_ip; /* = 0 */
 static unsigned long server_addr;
 static unsigned long timeout;
-static int packet_num = 0;
+static int packet_num; /* = 0 */
+static int pid_fd;
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
 #define LISTEN_RAW 2
 static int listen_mode = LISTEN_RAW;
 
-struct client_config_t client_config;
+#define DEFAULT_SCRIPT	"/usr/share/udhcpc/default.script"
+
+struct client_config_t client_config = {
+	/* Default options. */
+	abort_if_no_lease: 0,
+	foreground: 0,
+	interface: "eth0",
+	pidfile: NULL,
+	script: DEFAULT_SCRIPT,
+	clientid: NULL,
+	hostname: NULL,
+	ifindex: 0,
+	arp: "\0\0\0\0\0\0",		/* appease gcc-3.0 */
+};
 
 static void print_usage(void)
 {
-	printf("Usage: udhcpcd [OPTIONS]\n\n");
-	printf("  -d, --dir=PATH                  Path containing DHCP client scripts (default: /etc/udhcpc/)\n");
-	printf("  -p, --prefix=PREFIX             Prefix to add to scripts (default: none)\n");
-	printf("  -i, --interface=INTERFACE       Interface to use (default: eth0)\n");
-	printf("  -r, --request=IP                IP address to request (default: none)\n");
-	printf("  -c, --clientid=CLIENTID         Client identifier\n");
-	printf("  -H, --hostname=HOSTNAME         Client hostname\n");
-	printf("  -v, --version                   Display version\n");
-	
+	printf(
+"Usage: udhcpcd [OPTIONS]\n\n"
+"  -c, --clientid=CLIENTID         Client identifier\n"
+"  -H, --hostname=HOSTNAME         Client hostname\n"
+"  -f, --foreground                Do not fork after getting lease\n"
+"  -i, --interface=INTERFACE       Interface to use (default: eth0)\n"
+"  -n, --now                       Exit with failure if lease cannot be\n"
+"                                  immediately negotiated.\n"
+"  -p, --pidfile=file              Store process ID of daemon in file\n"
+"  -r, --request=IP                IP address to request (default: none)\n"
+"  -s, --script=file               Run file at dhcp events (default:\n"
+"                                  " DEFAULT_SCRIPT ")\n"
+"  -v, --version                   Display version\n"
+	);
 }
 
 
 /* SIGUSR1 handler (renew) */
-static void renew_requested(int pid)
+static void renew_requested(int sig)
 {
-	pid = 0;
+	sig = 0;
 	LOG(LOG_INFO, "Received SIGUSR1");
 	if (state == BOUND || state == RENEWING || state == REBINDING ||
 	    state == RELEASED) {
@@ -95,20 +115,75 @@ static void renew_requested(int pid)
 
 
 /* SIGUSR2 handler (release) */
-static void release_requested(int pid)
+static void release_requested(int sig)
 {
-	pid = 0;
+	sig = 0;
 	LOG(LOG_INFO, "Received SIGUSR2");
 	/* send release packet */
 	if (state == BOUND || state == RENEWING || state == REBINDING) {
 		send_release(server_addr, requested_ip); /* unicast */
-		script_deconfig();
+		run_script(NULL, "deconfig");
 	}
 
 	listen_mode = 0;
 	state = RELEASED;
 	timeout = 0xffffffff;
 }
+
+
+static void pidfile_acquire(void)
+{
+	if (client_config.pidfile == NULL) return;
+
+	pid_fd = open(client_config.pidfile, O_CREAT | O_WRONLY, 0644);
+	if (pid_fd < 0) {
+		LOG(LOG_ERR, "Unable to open pidfile %s: %s\n",
+		    client_config.pidfile, strerror(errno));
+	} else {
+		lockf(pid_fd, F_LOCK, 0);
+	}
+}
+
+
+static void pidfile_write_release(void)
+{
+	FILE *out;
+
+	if (client_config.pidfile == NULL || pid_fd < 0) return;
+
+	if ((out = fdopen(pid_fd, "w")) != NULL) {
+		fprintf(out, "%d\n", getpid());
+		fclose(out);
+	}
+	lockf(pid_fd, F_UNLCK, 0);
+	close(pid_fd);
+}
+
+
+static void background(void)
+{
+	if (!client_config.foreground) {
+		pidfile_acquire(); /* hold lock during fork. */
+		switch(fork()) {
+		case -1:
+			perror("fork");
+			exit(1);
+			/*NOTREACHED*/
+		case 0:
+			break; /* child continues */
+		default:
+			exit(0); /* parent exits */
+			/*NOTREACHED*/
+		}
+		close(0);
+		close(1);
+		close(2);
+		setsid();
+		client_config.foreground = 1; /* Do not fork again. */
+		pidfile_write_release();
+	}
+}
+
 
 #ifdef COMBINED_BINARY
 int udhcpc(int argc, char *argv[])
@@ -128,49 +203,26 @@ int main(int argc, char *argv[])
 	struct in_addr temp_addr;
 
 	static struct option options[] = {
-		{"dir", 1, 0, 'd'},
-		{"prefix", 1, 0, 'p'},
-		{"interface", 1, 0, 'i'},
-		{"request", 1, 0, 'r'},
-		{"clientid", 1, 0, 'c'},
-		{"hostname", 1, 0, 'H'},
-		{"version", 0, 0, 'v'},
-		{"help", 0, 0, 'h'},
+		{"clientid",	required_argument,	0, 'c'},
+		{"foreground",	no_argument,		0, 'f'},
+		{"hostname",	required_argument,	0, 'H'},
+		{"help",	no_argument,		0, 'h'},
+		{"interface",	required_argument,	0, 'i'},
+		{"now", 	no_argument,		0, 'n'},
+		{"pidfile",	required_argument,	0, 'p'},
+		{"request",	required_argument,	0, 'r'},
+		{"script",	required_argument,	0, 's'},
+		{"version",	no_argument,		0, 'v'},
 		{0, 0, 0, 0}
 	};
-
-	/* default options */
-	
-	client_config.dir = strdup("/etc/udhcpc/");
-	client_config.prefix = strdup("");
-	strcpy(client_config.interface, "eth0");
-	client_config.clientid = NULL;
 
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "d:p:i:r:c:H:vh", options, &option_index);
+		c = getopt_long(argc, argv, "c:fH:hi:np:r:s:v", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
-		case 'd':
-			if (client_config.dir) free(client_config.dir);
-			client_config.dir = malloc(strlen(optarg + 2));
-			strcpy(client_config.dir, optarg);
-			if (optarg[strlen(optarg) - 1] != '/')
-				strcat(client_config.dir, "/");
-			break;
-		case 'p': 
-			if (client_config.prefix) free(client_config.prefix);
-			client_config.prefix = strdup(optarg);
-			break;
-		case 'i':
-			strncpy(client_config.interface, optarg, 10);
-			client_config.interface[9] = '\0';
-			break;
-		case 'r':
-			requested_ip = inet_addr(optarg);
-			break;
 		case 'c':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
 			if (client_config.clientid) free(client_config.clientid);
@@ -178,6 +230,9 @@ int main(int argc, char *argv[])
 			client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
 			client_config.clientid[OPT_LEN] = len;
 			strncpy(client_config.clientid + 2, optarg, len);
+			break;
+		case 'f':
+			client_config.foreground = 1;
 			break;
 		case 'H':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
@@ -187,14 +242,36 @@ int main(int argc, char *argv[])
 			client_config.hostname[OPT_LEN] = len;
 			strncpy(client_config.hostname + 2, optarg, len);
 			break;
-		case 'v': printf("udhcpcd, version %s\n\n", VERSION); break;
-		case 'h': print_usage(); return 0;
+		case 'h':
+			print_usage();
+			return 0;
+		case 'i':
+			client_config.interface =  optarg;
+			break;
+		case 'n':
+			client_config.abort_if_no_lease = 1;
+			break;
+		case 'p':
+			client_config.pidfile = optarg;
+			break;
+		case 'r':
+			requested_ip = inet_addr(optarg);
+			break;
+		case 's':
+			client_config.script = optarg;
+			break;
+		case 'v':
+			printf("udhcpcd, version %s\n\n", VERSION);
+			break;
 		}
 	}
-	
+
 	OPEN_LOG("udhcpc");
 	LOG(LOG_INFO, "Moreton Bay DHCP Client (v%s) started", VERSION);
-	
+
+	pidfile_acquire();
+	pidfile_write_release();
+
 	if ((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
 		strcpy(ifr.ifr_name, client_config.interface);
 		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
@@ -225,15 +302,7 @@ int main(int argc, char *argv[])
 	signal(SIGUSR2, release_requested);
 	
 	state = INIT_SELECTING;
-	script_deconfig();
-
-#ifndef DEBUGGING
-	if (fork()) return 0;
-	else {
-		close(0);
-		setsid();
-	}
-#endif
+	run_script(NULL, "deconfig");
 
 	for (;;) {
 		if (fd > 0) {
@@ -276,6 +345,11 @@ int main(int argc, char *argv[])
 					timeout = time(0) + ((packet_num == 2) ? 10 : 2);
 					packet_num++;
 				} else {
+					if (client_config.abort_if_no_lease) {
+						LOG(LOG_INFO,
+						    "No lease, failing.");
+						exit(1);
+				  	}
 					/* wait to try again */
 					packet_num = 0;
 					timeout = time(0) + 60;
@@ -327,7 +401,7 @@ int main(int argc, char *argv[])
 					/* timed out, enter init state */
 					state = INIT_SELECTING;
 					LOG(LOG_INFO, "Lease lost, entering init state");
-					script_deconfig();
+					run_script(NULL, "deconfig");
 					timeout = time(0);
 					packet_num = 0;
 					listen_mode = LISTEN_RAW;
@@ -406,17 +480,18 @@ int main(int argc, char *argv[])
 					start = time(0);
 					timeout = t1 + start;
 					requested_ip = packet.yiaddr;
-					if (state == RENEWING || state == REBINDING)
-						script_renew(&packet);
-					else script_bound(&packet);
+					run_script(&packet,
+						   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
 
 					state = BOUND;
 					listen_mode = LISTEN_NONE;
+					background();
 					
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
 					LOG(LOG_INFO, "Received DHCP NAK");
-					if (state != REQUESTING) script_deconfig();
+					if (state != REQUESTING)
+						run_script(NULL, "deconfig");
 					state = INIT_SELECTING;
 					timeout = time(0);
 					requested_ip = 0;

@@ -1,10 +1,6 @@
 #ifndef _SCRIPT_H
 #define _SCRIPT_H
 
-
-void script_deconfig(void);
-void script_renew(struct dhcpMessage *packet);
-void script_bound(struct dhcpMessage *packet);
-
+void run_script(struct dhcpMessage *packet, const char *name);
 
 #endif

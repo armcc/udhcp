@@ -1,5 +1,11 @@
 # udhcp makefile
 
+prefix=/usr
+SBINDIR=/sbin
+USRSBINDIR=${prefix}/sbin
+USRBINDIR=${prefix}/bin
+USRSHAREDIR=${prefix}/share
+
 # Uncomment this to get a shared binary. Call as udhcpd for the server,
 # and udhcpc for the client
 #COMBINED_BINARY=1
@@ -8,13 +14,14 @@
 #DEBUG=1
 
 # Uncomment this to output messages to syslog, otherwise, messages go to stdout
-#CFLAGS += -DSYSLOG
+CFLAGS += -DSYSLOG
 
 #CROSS_COMPILE=arm-uclibc-
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
+INSTALL = install
 
-VER := 0.9.3
+VER := 0.9.4
 
 
 OBJS_SHARED = options.o socket.o packet.o
@@ -36,6 +43,10 @@ endif
 EXEC3 = dumpleases
 OBJS3 = dumpleases.o
 
+BOOT_PROGRAMS = udhcpc
+DAEMONS = udhcpd
+COMMANDS = dumpleases
+
 ifdef SYSLOG
 CFLAGS += -DSYSLOG
 endif
@@ -46,9 +57,13 @@ ifdef DEBUG
 CFLAGS += -g -DDEBUG
 else
 CFLAGS += -Os -fomit-frame-pointer
+STRIP=-s
 endif
 
 all: $(EXEC1) $(EXEC2) $(EXEC3)
+
+$(OBJS1) $(OBJS2) $(OBJS3): *.h Makefile
+$(EXEC1) $(EXEC2) $(EXEC3): Makefile
 
 .c.o:
 	$(CC) -c $(CFLAGS) $<
@@ -63,8 +78,21 @@ $(EXEC3): $(OBJS3)
 	$(LD) $(LDFLAGS) $(OBJS3) -o $(EXEC3)
 
 
+install: all
+
+	$(INSTALL) $(STRIP) $(DAEMONS) $(USRSBINDIR)
+	$(INSTALL) $(STRIP) $(COMMANDS) $(USRBINDIR)
+ifdef COMBINED_BINARY
+	ln -sf $(USRSBINDIR)/$(DAEMONS) $(SBINDIR)/$(BOOT_PROGRAMS)
+else
+	$(INSTALL) $(STRIP) $(BOOT_PROGRAMS) $(SBINDIR)
+endif
+	mkdir -p $(USRSHAREDIR)/udhcpc
+	for name in bound deconfig renew script ; do \
+		$(INSTALL) samples/sample.$$name \
+			$(USRSHAREDIR)/udhcpc/default.$$name ; \
+	done
+
 clean:
 	-rm -f udhcpd udhcpc dumpleases *.o core
 
-$(OBJS1) $(OBJS2) $(OBJS3): *.h Makefile
-$(EXEC1) $(EXEC2) $(EXEC3): Makefile
