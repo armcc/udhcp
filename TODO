@@ -1,5 +1,6 @@
 TODO
 ----
++ Check for valid IP, netmask, hostname, paths, strings, etc
 + Integrade README.*'s with manpages
 + using time(0) breaks if the system clock changes, find a portable solution
 + make failure of reading functions revert to previous value, not the default
