@@ -1,4 +1,4 @@
-/* dhcpd.h */
+/* dhcpc.h */
 #ifndef _DHCPC_H
 #define _DHCPC_H
 
