@@ -23,6 +23,12 @@
 int get_packet(struct dhcpMessage *packet, int fd)
 {
 	int bytes;
+	int i;
+	char broken_vendors[][8] = {
+		"MSFT 98",
+		""
+	};
+	char *vendor;
 
 	memset(packet, 0, sizeof(struct dhcpMessage));
 	bytes = read(fd, packet, sizeof(struct dhcpMessage));
@@ -36,6 +42,20 @@ int get_packet(struct dhcpMessage *packet, int fd)
 		return -1;
 	}
 	DEBUG(LOG_INFO, "oooooh!!! got some!");
+	
+	if (packet->op == BOOTREQUEST && (vendor = get_option(packet, DHCP_VENDOR))) {
+		for (i = 0; broken_vendors[i][0]; i++) {
+			if (vendor[OPT_LEN - 2] == (signed) strlen(broken_vendors[i]) &&
+			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2]) &&
+			    !(ntohs(packet->flags) & BROADCAST_FLAG)) {
+			    	DEBUG(LOG_INFO, "broken client (%s), forcing broadcast",
+			    		broken_vendors[i]);
+			    	packet->flags |= htons(BROADCAST_FLAG);
+			}
+		}
+	}
+			    	
+
 	return bytes;
 }
 

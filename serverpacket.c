@@ -46,25 +46,6 @@ static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcas
 {
 	u_int32_t ciaddr;
 	char chaddr[6];
-	int i;
-	char broken_vendors[][8] = {
-		"MSFT 98",
-		""
-	};
-	char *vendor;
-	
-	if ((vendor = get_option(payload, DHCP_VENDOR))) {
-		for (i = 0; broken_vendors[i][0]; i++) {
-			if (vendor[OPT_LEN - 2] == (signed) strlen(broken_vendors[i]) &&
-			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2]) &&
-			    !(ntohs(payload->flags) & BROADCAST_FLAG)) {
-			    	DEBUG(LOG_INFO, "broken client (%s), forcing broadcast\n",
-			    		broken_vendors[i]);
-			    	payload->flags |= htons(BROADCAST_FLAG);
-			}
-		}
-	}
-			    	
 	
 	if (force_broadcast) {
 		DEBUG(LOG_INFO, "broadcasting packet to client (NAK)");
