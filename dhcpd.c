@@ -96,13 +96,13 @@ int main(int argc, char *argv[])
 	
 	OPEN_LOG("udhcpd");
 	LOG(LOG_INFO, "udhcp server (v%s) started", VERSION);
-	
-	pid_fd = pidfile_acquire(server_config.pidfile);
-	pidfile_write_release(pid_fd);
 
 	memset(&server_config, 0, sizeof(struct server_config_t));
 	
 	read_config(DHCPD_CONF_FILE);
+	pid_fd = pidfile_acquire(server_config.pidfile);
+	pidfile_write_release(pid_fd);
+
 	if ((option = find_option(server_config.options, DHCP_LEASE_TIME))) {
 		memcpy(&server_config.lease, option->data + 2, 4);
 		server_config.lease = ntohl(server_config.lease);

@@ -1,4 +1,5 @@
 0.9.7 (pending)
++ Write pidfile after changing it (Steven CTR Carr <Steven.CTR.Carr@tc.faa.gov>)
 + Added env var docs to udhcpc man page (Matt)
 + Standardized lowercase udhcp in documentation (me)
 + Accept packets without a UDP checksum (me)
