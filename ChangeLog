@@ -1,8 +1,9 @@
 0.9.7 (pending)
 + Added env var docs to udhcpc man page (Matt)
 + Standardized lowercase udhcp in documentation (me)
-+ Accept packets without a UDP checksum
-+ Accept packets with extra garbage
++ Accept packets without a UDP checksum (me)
++ Accept packets with extra garbage (me)
++ Better error handling in files.c (me)
 
 0.9.6 (011001)
 + Added bootp paramaters to server (me)

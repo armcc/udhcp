@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <ctype.h>
+#include <netdb.h>
 
 #include "debug.h"
 #include "dhcpd.h"
@@ -22,21 +23,25 @@
 static int read_ip(char *line, void *arg)
 {
 	struct in_addr *addr = arg;
-	return inet_aton(line, addr);
+	struct hostent *host;
+	int retval = 1;
+
+	if (!inet_aton(line, addr)) {
+		if ((host = gethostbyname(line))) 
+			memcpy(addr, host->h_addr, host->h_length);
+		else retval = 0;
+	}
+	return retval;
 }
 
 
 static int read_str(char *line, void *arg)
 {
 	char **dest = arg;
-	int i;
 	
 	if (*dest) free(*dest);
 	*dest = strdup(line);
 	
-	/* elimate trailing whitespace */
-	for (i = strlen(*dest) - 1; i > 0 && isspace((*dest)[i]); i--);
-	(*dest)[i > 0 ? i + 1 : 0] = '\0';
 	return 1;
 }
 
@@ -44,8 +49,9 @@ static int read_str(char *line, void *arg)
 static int read_u32(char *line, void *arg)
 {
 	u_int32_t *dest = arg;
-	*dest = strtoul(line, NULL, 0);
-	return 1;
+	char *endptr;
+	*dest = strtoul(line, &endptr, 0);
+	return endptr[0] == '\0';
 }
 
 
@@ -66,10 +72,9 @@ static int read_yn(char *line, void *arg)
 static int read_opt(char *line, void *arg)
 {
 	struct option_set **opt_list = arg;
-	char *opt, *val;
-	char fail;
+	char *opt, *val, *endptr;
 	struct dhcp_option *option = NULL;
-	int length = 0;
+	int retval = 0, length = 0;
 	char buffer[255];
 	u_int16_t result_u16;
 	int16_t result_s16;
@@ -91,54 +96,60 @@ static int read_opt(char *line, void *arg)
 	do {
 		val = strtok(NULL, ", \t");
 		if (val) {
-			fail = 0;
-			length = 0;
+			length = option_lengths[option->flags & TYPE_MASK];
+			retval = 0;
 			switch (option->flags & TYPE_MASK) {
 			case OPTION_IP:
-				read_ip(val, buffer);
+				retval = read_ip(val, buffer);
 				break;
 			case OPTION_IP_PAIR:
-				read_ip(val, buffer);
-				if ((val = strtok(NULL, ", \t/-")))
-					read_ip(val, buffer + 4);
-				else fail = 1;
+				retval = read_ip(val, buffer);
+				if (!(val = strtok(NULL, ", \t/-"))) retval = 0;
+				if (retval) retval = read_ip(val, buffer + 4);
 				break;
 			case OPTION_STRING:
 				length = strlen(val);
-				if (length > 254) length = 254;
-				memcpy(buffer, val, length);
+				if (length > 0) {
+					if (length > 254) length = 254;
+					memcpy(buffer, val, length);
+					retval = 1;
+				}
 				break;
 			case OPTION_BOOLEAN:
-				if (!read_yn(val, buffer)) fail = 1;
+				retval = read_yn(val, buffer);
 				break;
 			case OPTION_U8:
-				buffer[0] = strtoul(val, NULL, 0);
+				buffer[0] = strtoul(val, &endptr, 0);
+				retval = (endptr[0] == '\0');
 				break;
 			case OPTION_U16:
-				result_u16 = htons(strtoul(val, NULL, 0));
+				result_u16 = htons(strtoul(val, &endptr, 0));
 				memcpy(buffer, &result_u16, 2);
+				retval = (endptr[0] == '\0');
 				break;
 			case OPTION_S16:
-				result_s16 = htons(strtol(val, NULL, 0));
+				result_s16 = htons(strtol(val, &endptr, 0));
 				memcpy(buffer, &result_s16, 2);
+				retval = (endptr[0] == '\0');
 				break;
 			case OPTION_U32:
-				result_u32 = htonl(strtoul(val, NULL, 0));
+				result_u32 = htonl(strtoul(val, &endptr, 0));
 				memcpy(buffer, &result_u32, 4);
+				retval = (endptr[0] == '\0');
 				break;
 			case OPTION_S32:
-				result_s32 = htonl(strtol(val, NULL, 0));	
+				result_s32 = htonl(strtol(val, &endptr, 0));	
 				memcpy(buffer, &result_s32, 4);
+				retval = (endptr[0] == '\0');
 				break;
 			default:
 				break;
 			}
-			length += option_lengths[option->flags & TYPE_MASK];
-			if (!fail)
+			if (retval) 
 				attach_option(opt_list, option, buffer, length);
-		} else fail = 1;
-	} while (!fail && option->flags & OPTION_LIST);
-	return 1;
+		};
+	} while (val && retval && option->flags & OPTION_LIST);
+	return retval;
 }
 
 
@@ -169,7 +180,7 @@ static struct config_keyword keywords[] = {
 int read_config(char *file)
 {
 	FILE *in;
-	char buffer[80], *token, *line;
+	char buffer[80], orig[80], *token, *line;
 	int i;
 
 	for (i = 0; strlen(keywords[i].keyword); i++)
@@ -183,6 +194,7 @@ int read_config(char *file)
 	
 	while (fgets(buffer, 80, in)) {
 		if (strchr(buffer, '\n')) *(strchr(buffer, '\n')) = '\0';
+		strncpy(orig, buffer, 80);
 		if (strchr(buffer, '#')) *(strchr(buffer, '#')) = '\0';
 		token = buffer + strspn(buffer, " \t");
 		if (*token == '\0') continue;
@@ -190,12 +202,20 @@ int read_config(char *file)
 		if (*line == '\0') continue;
 		*line = '\0';
 		line++;
+		
+		/* eat leading whitespace */
 		line = line + strspn(line, " \t=");
-		if (*line == '\0') continue;
+		/* eat trailing whitespace */
+		for (i = strlen(line) - 1; i > 0 && isspace(line[i]); i--);
+		line[i > 0 ? i + 1 : 0] = '\0';
 		
 		for (i = 0; strlen(keywords[i].keyword); i++)
 			if (!strcasecmp(token, keywords[i].keyword))
-				keywords[i].handler(line, keywords[i].var);
+				if (!keywords[i].handler(line, keywords[i].var)) {
+					LOG(LOG_ERR, "unable to parse '%s'", orig);
+					/* reset back to the default value */
+					keywords[i].handler(keywords[i].def, keywords[i].var);
+				}
 	}
 	fclose(in);
 	return 1;
