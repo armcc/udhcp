@@ -163,7 +163,7 @@ static struct config_keyword keywords[] = {
 	{"conflict_time",read_u32,&(server_config.conflict_time),"3600"},
 	{"offer_time",	read_u32, &(server_config.offer_time),	"60"},
 	{"min_lease",	read_u32, &(server_config.min_lease),	"60"},
-	{"lease_file",	read_str, &(server_config.lease_file),	"/etc/udhcpd.leases"},
+	{"lease_file",	read_str, &(server_config.lease_file),	"/var/lib/misc/udhcpd.leases"},
 	{"pidfile",	read_str, &(server_config.pidfile),	"/var/run/udhcpd.pid"},
 	{"notify_file", read_str, &(server_config.notify_file),	""},
 	{"siaddr",	read_ip,  &(server_config.siaddr),	"0.0.0.0"},
@@ -272,21 +272,16 @@ void read_leases(char *file)
 	while (i < server_config.max_leases && (fread(&lease, sizeof lease, 1, fp) == 1)) {
 		/* ADDME: is it a static lease */
 		if (lease.yiaddr >= server_config.start && lease.yiaddr <= server_config.end) {
-			leases[i].yiaddr = lease.yiaddr;
-			leases[i].expires = ntohl(lease.expires);	
-			if (server_config.remaining) leases[i].expires += curr;
-			memcpy(leases[i].chaddr, lease.chaddr, sizeof(lease.chaddr));
+			lease.expires = ntohl(lease.expires);
+			if (server_config.remaining) lease.expires += curr;
+			if (!(add_lease(lease.chaddr, lease.yiaddr, lease.expires))) {
+				LOG(LOG_WARNING, "Too many leases while loading %s\n", file);
+				break;
+			}				
 			i++;
 		}
 	}
-	
 	DEBUG(LOG_INFO, "Read %d leases", i);
-	
-	if (i == server_config.max_leases) {
-		if (fgetc(fp) == EOF)
-			/* might be helpfull to drop expired leases */
-			LOG(LOG_WARNING, "Too many leases while loading %s\n", file);
-	}
 	fclose(fp);
 }
 		

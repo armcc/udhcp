@@ -46,7 +46,7 @@ int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *mac, char *interface)
 	time_t		prevTime;
 
 
-	if ((s = socket (AF_INET, SOCK_PACKET, htons(ETH_P_ARP))) == -1) {
+	if ((s = socket (PF_PACKET, SOCK_PACKET, htons(ETH_P_ARP))) == -1) {
 		LOG(LOG_ERR, "Could not open raw socket");
 		return -1;
 	}

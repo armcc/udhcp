@@ -6,7 +6,7 @@ struct config_keyword {
 	char keyword[14];
 	int (*handler)(char *line, void *var);
 	void *var;
-	char def[20];
+	char def[30];
 };
 
 

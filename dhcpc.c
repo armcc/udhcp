@@ -262,6 +262,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			printf("udhcpcd, version %s\n\n", VERSION);
+			exit_client(0);
 			break;
 		}
 	}
