@@ -55,19 +55,18 @@ static inline void sanitize_fds(void)
 void background(const char *pidfile)
 {
 #ifdef __uClinux__
-	LOG(LOG_ERR, "Cannot background in uclinux (yet)");	
+	LOG(LOG_ERR, "Cannot background in uclinux (yet)");
 #else /* __uClinux__ */
 	int pid_fd;
 
-	if (!pidfile) return;
-
-	pid_fd = pidfile_acquire(pidfile); /* hold lock during fork. */
+	/* hold lock during fork. */
+	if (pidfile) pid_fd = pidfile_acquire(pidfile);
 	if (daemon(0, 0) == -1) {
 		perror("fork");
 		exit(1);
 	}
 	daemonized++;
-	pidfile_write_release(pid_fd);
+	if (pidfile) pidfile_write_release(pid_fd);
 #endif /* __uClinux__ */
 }
 
@@ -97,8 +96,10 @@ void start_log_and_pid(const char *client_server, const char *pidfile)
 	sanitize_fds();
 
 	/* do some other misc startup stuff while we are here to save bytes */
-	pid_fd = pidfile_acquire(pidfile);
-	pidfile_write_release(pid_fd);
+	if (pidfile) {
+		pid_fd = pidfile_acquire(pidfile);
+		pidfile_write_release(pid_fd);
+	}
 
 	/* equivelent of doing a fflush after every \n */
 	setlinebuf(stdout);
@@ -144,8 +145,10 @@ void start_log_and_pid(const char *client_server, const char *pidfile)
 	sanitize_fds();
 
 	/* do some other misc startup stuff while we are here to save bytes */
-	pid_fd = pidfile_acquire(pidfile);
-	pidfile_write_release(pid_fd);
+	if (pidfile) {
+		pid_fd = pidfile_acquire(pidfile);
+		pidfile_write_release(pid_fd);
+	}
 
 	/* equivelent of doing a fflush after every \n */
 	setlinebuf(stdout);
