@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ Fixed reading of client id (David Poole <davep@portsmith.com>)
 + change sys_errlist[] to strerror() as it aparently doesn't exist
   (andersee <andersee@codepoet.org>)
 + fixed get_raw_packet so it returns -2 on non fatal errors
