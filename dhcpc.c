@@ -125,7 +125,7 @@ static void perform_renew(void)
 		state = RENEW_REQUESTED;
 		break;
 	case RENEW_REQUESTED: /* impatient are we? fine, square 1 */
-		script(NULL, "deconfig");
+		run_script(NULL, "deconfig");
 	case REQUESTING:
 	case RELEASED:
 		change_mode(LISTEN_RAW);
@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
 					packet_num++;
 				} else {
 					/* timed out, go back to init state */
-					if (state == RENEW_REQUESTED) script(NULL, "deconfig");
+					if (state == RENEW_REQUESTED) run_script(NULL, "deconfig");
 					state = INIT_SELECTING;
 					timeout = now;
 					packet_num = 0;
