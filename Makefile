@@ -14,7 +14,7 @@
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 
-VER := 0.9.1
+VER := 0.9.2
 
 
 OBJS_SHARED = options.o socket.o packet.o
@@ -64,7 +64,7 @@ $(EXEC3): $(OBJS3)
 
 
 clean:
-	-rm -f udhcpd udhcpc dupmleases *.o core
+	-rm -f udhcpd udhcpc dumpleases *.o core
 
 $(OBJS1) $(OBJS2) $(OBJS3): *.h Makefile
 $(EXEC1) $(EXEC2) $(EXEC3): Makefile
