@@ -56,6 +56,7 @@ options for the udhcp client are:
 -i, --interface=INTERFACE       Interface to use (default: eth0)
 -r, --request=IP                IP address to request (default: none)
 -c, --clientid=CLIENTID         Client identifier
+-H, --hostname=HOSTNAME         Client hostname
 -v, --version                   Display version
 
 If the requested IP address cannot be obtained, the client accepts the

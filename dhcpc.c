@@ -65,6 +65,7 @@ static void print_usage(void)
 	printf("  -i, --interface=INTERFACE       Interface to use (default: eth0)\n");
 	printf("  -r, --request=IP                IP address to request (default: none)\n");
 	printf("  -c, --clientid=CLIENTID         Client identifier\n");
+	printf("  -H, --hostname=HOSTNAME         Client hostname\n");
 	printf("  -v, --version                   Display version\n");
 	
 }
@@ -131,6 +132,7 @@ int main(int argc, char *argv[])
 		{"interface", 1, 0, 'i'},
 		{"request", 1, 0, 'r'},
 		{"clientid", 1, 0, 'c'},
+		{"hostname", 1, 0, 'H'},
 		{"version", 0, 0, 'v'},
 		{"help", 0, 0, 'h'},
 		{0, 0, 0, 0}
@@ -146,7 +148,7 @@ int main(int argc, char *argv[])
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "d:p:i:r:c:vh", options, &option_index);
+		c = getopt_long(argc, argv, "d:p:i:r:c:H:vh", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
@@ -175,6 +177,14 @@ int main(int argc, char *argv[])
 			client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
 			client_config.clientid[OPT_LEN] = len;
 			strncpy(client_config.clientid + 2, optarg, len);
+			break;
+		case 'H':
+			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
+			if (client_config.hostname) free(client_config.hostname);
+			client_config.hostname = malloc(len + 2);
+			client_config.hostname[OPT_CODE] = DHCP_HOST_NAME;
+			client_config.hostname[OPT_LEN] = len;
+			strncpy(client_config.hostname + 2, optarg, len);
 			break;
 		case 'v': printf("udhcpcd, version %s\n\n", VERSION); break;
 		case 'h': print_usage(); return 0;
