@@ -1,3 +1,7 @@
+0.9.9 (pending)
++ added an new enviromental variable: $mask. It contains the number
+  of subnet bits for tools like ip route that require it.
+
 0.9.8 (021031)
 + split up README files (me)
 + use /dev/urandom to seed xid's (instead of time(0)) (me)

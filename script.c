@@ -58,8 +58,20 @@ static int upper_length(int length, struct dhcp_option *option)
 }
 
 
-static int sprintip(char *dest, char *pre, unsigned char *ip) {
+static int sprintip(char *dest, char *pre, unsigned char *ip)
+{
 	return sprintf(dest, "%s%d.%d.%d.%d ", pre, ip[0], ip[1], ip[2], ip[3]);
+}
+
+
+/* really simple implementation, just count the bits */
+static int mton(struct in_addr *mask)
+{
+	int i;
+	/* note: mask will always be in network byte order, so
+	 * there are no endian issues */
+	for (i = 31; i >= 0 && !((mask->s_addr >> i) & 1); i--);
+	return i + 1;
 }
 
 
@@ -142,6 +154,7 @@ static char **fill_envp(struct dhcpMessage *packet)
 	int i, j;
 	char **envp;
 	unsigned char *temp;
+	struct in_addr subnet;
 	char over = 0;
 
 	if (packet == NULL)
@@ -158,23 +171,32 @@ static char **fill_envp(struct dhcpMessage *packet)
 	}
 	
 	envp = xmalloc((num_options + 5) * sizeof(char *));
-	envp[0] = xmalloc(sizeof("interface=") + strlen(client_config.interface));
+	j = 0;
+	envp[j++] = xmalloc(sizeof("interface=") + strlen(client_config.interface));
 	sprintf(envp[0], "interface=%s", client_config.interface);
-	envp[1] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
-	envp[2] = find_env("HOME", "HOME=/");
+	envp[j++] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
+	envp[j++] = find_env("HOME", "HOME=/");
 
 	if (packet == NULL) {
-		envp[3] = NULL;
+		envp[j++] = NULL;
 		return envp;
 	}
 
-	envp[3] = xmalloc(sizeof("ip=255.255.255.255"));
-	sprintip(envp[3], "ip=", (unsigned char *) &packet->yiaddr);
-	for (i = 0, j = 4; options[i].code; i++) {
-		if ((temp = get_option(packet, options[i].code))) {
-			envp[j] = xmalloc(upper_length(temp[OPT_LEN - 2], &options[i]) + strlen(options[i].name) + 2);
-			fill_options(envp[j], temp, &options[i]);
-			j++;
+	envp[j] = xmalloc(sizeof("ip=255.255.255.255"));
+	sprintip(envp[j++], "ip=", (unsigned char *) &packet->yiaddr);
+
+
+	for (i = 0; options[i].code; i++) {
+		if (!(temp = get_option(packet, options[i].code)))
+			continue;
+		envp[j] = xmalloc(upper_length(temp[OPT_LEN - 2], &options[i]) + strlen(options[i].name) + 2);
+		fill_options(envp[j++], temp, &options[i]);
+
+		/* Fill in a subnet bits option for things like /24 */
+		if (options[i].code == DHCP_SUBNET) {
+			envp[j] = xmalloc(sizeof("mask=32"));
+			memcpy(&subnet, temp, 4);
+			sprintf(envp[j++], "mask=%d", mton(&subnet));
 		}
 	}
 	if (packet->siaddr) {

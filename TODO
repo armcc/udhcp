@@ -10,6 +10,7 @@ TODO
 + make sure packet generation works on a wide varitey of arches
 + Interoperability testing
 + Hooks within the DHCP server
+	* Server notification when a lease is added/removed
 + Additional bootp support in client/server
 + Make serverid option in server configurable
 + Possibly add failure message to DHCP NAK
