@@ -65,6 +65,7 @@ struct client_config_t client_config = {
 	abort_if_no_lease: 0,
 	foreground: 0,
 	quit_after_lease: 0,
+	background_if_no_lease: 0,
 	interface: "eth0",
 	pidfile: NULL,
 	script: DEFAULT_SCRIPT,
@@ -81,6 +82,8 @@ static void print_usage(void)
 "  -c, --clientid=CLIENTID         Client identifier\n"
 "  -H, --hostname=HOSTNAME         Client hostname\n"
 "  -f, --foreground                Do not fork after getting lease\n"
+"  -b, --background                Fork to background if lease cannot be\n"
+"                                  immediately negotiated.\n"
 "  -i, --interface=INTERFACE       Interface to use (default: eth0)\n"
 "  -n, --now                       Exit with failure if lease cannot be\n"
 "                                  immediately negotiated.\n"
@@ -165,18 +168,15 @@ static void terminate(int sig)
 static void background(void)
 {
 	int pid_fd;
-	if (client_config.quit_after_lease) {
-		exit_client(0);
-	} else if (!client_config.foreground) {
-		pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
-		while (pid_fd >= 0 && pid_fd < 3) pid_fd = dup(pid_fd); /* don't let daemon close it */
-		if (daemon(0, 0) == -1) {
-			perror("fork");
-			exit_client(1);
-		}
-		client_config.foreground = 1; /* Do not fork again. */
-		pidfile_write_release(pid_fd);
+
+	pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
+	while (pid_fd >= 0 && pid_fd < 3) pid_fd = dup(pid_fd); /* don't let daemon close it */
+	if (daemon(0, 0) == -1) {
+		perror("fork");
+		exit_client(1);
 	}
+	client_config.foreground = 1; /* Do not fork again. */
+	pidfile_write_release(pid_fd);
 }
 
 
@@ -201,6 +201,7 @@ int main(int argc, char *argv[])
 	static struct option options[] = {
 		{"clientid",	required_argument,	0, 'c'},
 		{"foreground",	no_argument,		0, 'f'},
+		{"background",	no_argument,		0, 'b'},
 		{"hostname",	required_argument,	0, 'H'},
 		{"help",	no_argument,		0, 'h'},
 		{"interface",	required_argument,	0, 'i'},
@@ -216,7 +217,7 @@ int main(int argc, char *argv[])
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:fH:hi:np:qr:s:v", options, &option_index);
+		c = getopt_long(argc, argv, "c:fbH:hi:np:qr:s:v", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
@@ -231,6 +232,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			client_config.foreground = 1;
+			break;
+		case 'b':
+			client_config.background_if_no_lease = 1;
 			break;
 		case 'H':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
@@ -333,7 +337,10 @@ int main(int argc, char *argv[])
 					timeout = now + ((packet_num == 2) ? 10 : 2);
 					packet_num++;
 				} else {
-					if (client_config.abort_if_no_lease) {
+					if (client_config.background_if_no_lease) {
+						LOG(LOG_INFO, "No lease, forking to background.");
+						background();
+					} else if (client_config.abort_if_no_lease) {
 						LOG(LOG_INFO, "No lease, failing.");
 						exit_client(1);
 				  	}
@@ -475,8 +482,11 @@ int main(int argc, char *argv[])
 
 					state = BOUND;
 					change_mode(LISTEN_NONE);
-					background();
-					
+					if (client_config.quit_after_lease) 
+						exit_client(0);
+					if (!client_config.foreground)
+						background();
+
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
 					LOG(LOG_INFO, "Received DHCP NAK");

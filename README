@@ -62,6 +62,8 @@ options for the udhcp client are:
 -c, --clientid=CLIENTID         Client identifier
 -H, --hostname=HOSTNAME         Client hostname
 -f, --foreground                Do not fork after getting lease
+-b, --background                Fork to background if lease cannot be
+                                immediately negotiated.
 -i, --interface=INTERFACE       Interface to use (default: eth0)
 -n, --now                       Exit with failure if lease cannot be
                                 immediately negotiated.

@@ -17,6 +17,7 @@ struct client_config_t {
 	char foreground;		/* Do not fork */
 	char quit_after_lease;		/* Quit after obtaining lease */
 	char abort_if_no_lease;		/* Abort if no lease */
+	char background_if_no_lease;	/* Fork to background if no lease */
 	char *interface;		/* The name of the interface to use */
 	char *pidfile;			/* Optionally store the process ID */
 	char *script;			/* User script to run at dhcp events */

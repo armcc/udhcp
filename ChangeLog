@@ -4,6 +4,7 @@
 + fixed get_raw_packet so it returns -2 on non fatal errors
   (Ted Lemon <Ted.Lemon@nominum.com>)
 + Improved (hopefully) NAKing behavior (me)
++ Added -b option (Jouni Malinen)
 + Compute checksums correctly on big endian hosts 
   (Jouni Malinen <jkmaline@cc.hut.fi>)
 
