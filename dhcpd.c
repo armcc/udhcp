@@ -178,9 +178,11 @@ int main(int argc, char *argv[])
 		if (retval == 0) {
 			write_leases(0);
 			timeout_end = time(0) + server_config.auto_time;
+			close(server_socket);
 			continue;
 		} else if (retval < 0) {
 			DEBUG(LOG_INFO, "error on select");
+			close(server_socket);
 			continue;
 		}
 		
