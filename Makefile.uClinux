@@ -1,0 +1,15 @@
+EXEC = dhcpd
+OBJS = dhcpd.o arpping.o
+
+
+all: $(EXEC)
+
+$(EXEC): $(OBJS)
+	$(LD) $(LDFLAGS) -o $@.elf $(OBJS) $(LDLIBS)
+	$(CONVERT)
+
+clean:
+	-rm -f $(EXEC) *.elf *.o
+
+$(OBJS): dhcpd.h
+
