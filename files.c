@@ -261,7 +261,6 @@ void read_leases(char *file)
 {
 	FILE *fp;
 	unsigned int i = 0;
-	time_t curr = time(0);
 	struct dhcpOfferedAddr lease;
 	
 	if (!(fp = fopen(file, "r"))) {
@@ -273,7 +272,7 @@ void read_leases(char *file)
 		/* ADDME: is it a static lease */
 		if (lease.yiaddr >= server_config.start && lease.yiaddr <= server_config.end) {
 			lease.expires = ntohl(lease.expires);
-			if (server_config.remaining) lease.expires += curr;
+			if (!server_config.remaining) lease.expires -= time(0);
 			if (!(add_lease(lease.chaddr, lease.yiaddr, lease.expires))) {
 				LOG(LOG_WARNING, "Too many leases while loading %s\n", file);
 				break;
