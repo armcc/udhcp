@@ -119,6 +119,9 @@ struct server_config_t {
 	char *lease_file;
 	char *pid_file;
 	char *notify_file;		/* What to run whenever leases are written */
+	u_int32_t siaddr;		/* next server bootp option */
+	char *sname;			/* bootp server name */
+	char *boot_file;		/* bootp boot file option */
 };	
 
 extern struct server_config_t server_config;

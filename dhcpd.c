@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 	argc = argv[0][0]; /* get rid of some warnings */
 	
 	OPEN_LOG("udhcpd");
-	LOG(LOG_INFO, "Moreton Bay DHCP Server (v%s) started", VERSION);
+	LOG(LOG_INFO, "uDHCP Server (v%s) started", VERSION);
 	
 	memset(&server_config, 0, sizeof(struct server_config_t));
 	

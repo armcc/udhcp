@@ -100,6 +100,17 @@ static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacke
 }
 
 
+/* add in the bootp options */
+static void add_bootp_options(struct dhcpMessage *packet)
+{
+	packet->siaddr = server_config.siaddr;
+	if (server_config.sname)
+		strncpy(packet->sname, server_config.sname, sizeof(packet->sname) - 1);
+	if (server_config.boot_file)
+		strncpy(packet->file, server_config.boot_file, sizeof(packet->file) - 1);
+}
+	
+
 /* send a DHCP OFFER to a DHCP DISCOVER */
 int sendOffer(struct dhcpMessage *oldpacket)
 {
@@ -111,7 +122,7 @@ int sendOffer(struct dhcpMessage *oldpacket)
 	struct in_addr addr;
 
 	init_packet(&packet, oldpacket, DHCPOFFER);
-
+	
 	/* the client is in our lease/offered table */
 	if ((lease = find_lease_by_chaddr(oldpacket->chaddr))) {
 		if (!lease_expired(lease)) 
@@ -172,6 +183,8 @@ int sendOffer(struct dhcpMessage *oldpacket)
 			add_option_string(packet.options, curr->data);
 		curr = curr->next;
 	}
+
+	add_bootp_options(&packet);
 	
 	addr.s_addr = packet.yiaddr;
 	LOG(LOG_INFO, "sending OFFER of %s", inet_ntoa(addr));
@@ -218,7 +231,9 @@ int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr)
 			add_option_string(packet.options, curr->data);
 		curr = curr->next;
 	}
-	
+
+	add_bootp_options(&packet);
+
 	addr.s_addr = packet.yiaddr;
 	LOG(LOG_INFO, "sending ACK to %s", inet_ntoa(addr));
 
@@ -244,6 +259,8 @@ int send_inform(struct dhcpMessage *oldpacket)
 			add_option_string(packet.options, curr->data);
 		curr = curr->next;
 	}
+
+	add_bootp_options(&packet);
 
 	return send_packet(&packet, 0);
 }
