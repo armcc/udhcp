@@ -2,6 +2,8 @@
 + Added bootp paramaters to server (me)
 + Added bootp paramaters to client (me)
 + Added vendor id to client (me)
++ Better pdfile handling in client and server (me)
++ Added man pages (Matt Kraai <kraai@alumni.carnegiemellon.edu>)
 
 0.9.5 (010914)
 + Fixed $HOME and $PATH env passing (me)
