@@ -6,6 +6,7 @@
  */
 
 #include <sys/time.h>
+#include <sys/sysinfo.h>
 #include <time.h>
 #include <sys/socket.h>
 #include <netinet/if_ether.h>
@@ -41,6 +42,7 @@ int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
 	fd_set		fdset;
 	struct timeval	tm;
 	time_t		prevTime;
+	struct sysinfo info;
 
 
 	if ((s = socket (PF_PACKET, SOCK_PACKET, htons(ETH_P_ARP))) == -1) {
@@ -79,7 +81,8 @@ int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
 
 	/* wait arp reply, and check it */
 	tm.tv_usec = 0;
-	time(&prevTime);
+	sysinfo(&info);
+	prevTime = info.uptime;
 	while (timeout > 0) {
 		FD_ZERO(&fdset);
 		FD_SET(s, &fdset);
@@ -97,8 +100,9 @@ int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
 				break;
 			}
 		}
-		timeout -= time(NULL) - prevTime;
-		time(&prevTime);
+		sysinfo(&info);
+		timeout -= info.uptime - prevTime;
+		prevTime = info.uptime;
 	}
 	close(s);
 	DEBUG(LOG_INFO, "%salid arp replies for this address", rv ? "No v" : "V");	
