@@ -60,7 +60,8 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 				*addr = sin->sin_addr.s_addr;
 				DEBUG(LOG_INFO, "%s (our ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
 			} else {
-				LOG(LOG_ERR, "SIOCGIFADDR failed!: %s", strerror(errno));
+				LOG(LOG_ERR, "SIOCGIFADDR failed, is the interface up and configured?: %s", 
+						strerror(errno));
 				return -1;
 			}
 		}
