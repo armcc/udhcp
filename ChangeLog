@@ -1,4 +1,6 @@
 0.9.8 (pending)
++ Was improperly reporting yiaddr as siaddr (ben-udhcp@bdlow.net)
+  udhcp bug#1256
 + Fixed reading of client id (David Poole <davep@portsmith.com>)
 + change sys_errlist[] to strerror() as it aparently doesn't exist
   (andersee <andersee@codepoet.org>)
