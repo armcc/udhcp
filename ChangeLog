@@ -1,6 +1,8 @@
 0.9.9 (pending)
++ Finally got rid of the trailing space in enviromental vars (me)
 + added an new enviromental variable: $mask. It contains the number
   of subnet bits for tools like ip route that require it.
+  (Bastian Blank <waldi@debian.org>, me)
 
 0.9.8 (021031)
 + split up README files (me)

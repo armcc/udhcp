@@ -60,7 +60,7 @@ static int upper_length(int length, struct dhcp_option *option)
 
 static int sprintip(char *dest, char *pre, unsigned char *ip)
 {
-	return sprintf(dest, "%s%d.%d.%d.%d ", pre, ip[0], ip[1], ip[2], ip[3]);
+	return sprintf(dest, "%s%d.%d.%d.%d", pre, ip[0], ip[1], ip[2], ip[3]);
 }
 
 
@@ -100,26 +100,26 @@ static void fill_options(char *dest, unsigned char *option, struct dhcp_option *
 			dest += sprintip(dest, "", option);
  			break;
 		case OPTION_BOOLEAN:
-			dest += sprintf(dest, *option ? "yes " : "no ");
+			dest += sprintf(dest, *option ? "yes" : "no");
 			break;
 		case OPTION_U8:
-			dest += sprintf(dest, "%u ", *option);
+			dest += sprintf(dest, "%u", *option);
 			break;
 		case OPTION_U16:
 			memcpy(&val_u16, option, 2);
-			dest += sprintf(dest, "%u ", ntohs(val_u16));
+			dest += sprintf(dest, "%u", ntohs(val_u16));
 			break;
 		case OPTION_S16:
 			memcpy(&val_s16, option, 2);
-			dest += sprintf(dest, "%d ", ntohs(val_s16));
+			dest += sprintf(dest, "%d", ntohs(val_s16));
 			break;
 		case OPTION_U32:
 			memcpy(&val_u32, option, 4);
-			dest += sprintf(dest, "%lu ", (unsigned long) ntohl(val_u32));
+			dest += sprintf(dest, "%lu", (unsigned long) ntohl(val_u32));
 			break;
 		case OPTION_S32:
 			memcpy(&val_s32, option, 4);
-			dest += sprintf(dest, "%ld ", (long) ntohl(val_s32));
+			dest += sprintf(dest, "%ld", (long) ntohl(val_s32));
 			break;
 		case OPTION_STRING:
 			memcpy(dest, option, len);
@@ -129,6 +129,7 @@ static void fill_options(char *dest, unsigned char *option, struct dhcp_option *
 		option += optlen;
 		len -= optlen;
 		if (len <= 0) break;
+		dest += sprintf(dest, " ");
 	}
 }
 
