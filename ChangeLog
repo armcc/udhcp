@@ -1,4 +1,6 @@
 0.9.7 (pending)
++ Added script hook for DHCPNAK (nak), as well as providing the message option
+  (me)
 + Generate the paramaters request list by seeing what options in options.c are
   ored with OPTION_REQ in options.c
 + Fix dhcp renew forgetfullness on client (bug #1230)

@@ -478,6 +478,7 @@ int main(int argc, char *argv[])
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
 					LOG(LOG_INFO, "Received DHCP NAK");
+					run_script(&packet, "nak");
 					if (state != REQUESTING)
 						run_script(NULL, "deconfig");
 					state = INIT_SELECTING;

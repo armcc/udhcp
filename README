@@ -96,6 +96,12 @@ are:
 	will not change, however, the other DHCP paramaters, such as the
 	default gateway, subnet mask, and dns server may change.
 
+	nak: This argument is used with udhcpc receives a NAK message.
+	The script with the deconfig argument will be called directly
+	afterwards, so no changes to the network interface are neccessary.
+	This hook is provided for purely informational purposes (the
+	message option may contain a reason for the NAK).
+
 The paramaters for enviromental variables are as follows:
 
 	$HOME		- The set $HOME env or "/"
@@ -128,6 +134,7 @@ The paramaters for enviromental variables are as follows:
 	lease		- The lease time, in seconds
 	dhcptype	- DHCP message type (safely ignored)
 	serverid	- The IP of the server
+	message		- Reason for a DHCPNAK
 	tftp		- The TFTP server name
 	bootfile	- The bootfile name
 
