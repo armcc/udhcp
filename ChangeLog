@@ -1,4 +1,6 @@
 0.9.8 (pending)
++ Was improperly reporting yiaddr as siaddr (ben-udhcp@bdlow.net)
+  udhcp bug#1256
 + change sys_errlist[] to strerror() as it aparently doesn't exist
   (Erik Andersen <andersee@codepoet.org>)
 + Improved (hopefully) NAKing behavior (me)

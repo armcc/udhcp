@@ -179,7 +179,7 @@ static char **fill_envp(struct dhcpMessage *packet)
 	}
 	if (packet->siaddr) {
 		envp[j] = malloc(sizeof("siaddr=255.255.255.255"));
-		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->yiaddr);
+		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->siaddr);
 	}
 	if (!(over & FILE_FIELD) && packet->file[0]) {
 		/* watch out for invalid packets */
