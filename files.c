@@ -22,8 +22,7 @@
 static int read_ip(char *line, void *arg)
 {
 	struct in_addr *addr = arg;
-	inet_aton(line, addr);
-	return 1;
+	return inet_aton(line, addr);
 }
 
 
@@ -193,8 +192,6 @@ int read_config(char *file)
 		line++;
 		line = line + strspn(line, " \t=");
 		if (*line == '\0') continue;
-		
-		
 		
 		for (i = 0; strlen(keywords[i].keyword); i++)
 			if (!strcasecmp(token, keywords[i].keyword))
