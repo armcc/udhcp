@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <ctype.h>
 
 #include "debug.h"
 #include "dhcpd.h"
@@ -29,9 +30,14 @@ static int read_ip(char *line, void *arg)
 static int read_str(char *line, void *arg)
 {
 	char **dest = arg;
+	int i;
 	
 	if (*dest) free(*dest);
 	*dest = strdup(line);
+	
+	/* elimate trailing whitespace */
+	for (i = strlen(*dest) - 1; i > 0 && isspace(*dest[i]); i--);
+	*dest[i] = '\0';
 	return 1;
 }
 
@@ -169,7 +175,7 @@ int read_config(char *file)
 			keywords[i].handler(keywords[i].def, keywords[i].var);
 
 	if (!(in = fopen(file, "r"))) {
-		DEBUG(LOG_ERR, "unable to open config file: %s", file);
+		LOG(LOG_ERR, "unable to open config file: %s", file);
 		return 0;
 	}
 	
