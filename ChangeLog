@@ -1,4 +1,5 @@
 0.9.7 (pending)
++ Only reopen port on errors (me)
 + Change fork/close/setsid structures to daemon() (me)
 + Allow user to specify udhcpd config file at run time (Steven, me)
 + Write pidfile after changing it (Steven CTR Carr <Steven.CTR.Carr@tc.faa.gov>)

@@ -92,7 +92,6 @@ int main(int argc, char *argv[])
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
 	int pid_fd;
-	argc = argv[0][0]; /* get rid of some warnings */
 	
 	OPEN_LOG("udhcpd");
 	LOG(LOG_INFO, "udhcp server (v%s) started", VERSION);
@@ -136,11 +135,11 @@ int main(int argc, char *argv[])
 	timeout_end = time(0) + server_config.auto_time;
 	while(1) { /* loop until universe collapses */
 
-		close(server_socket);
-		if ((server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface)) < 0) {
-			LOG(LOG_ERR, "FATAL: couldn't create server socket");
-			exit_server(0);
-		}			
+		if (server_socket < 0)
+			if ((server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface)) < 0) {
+				LOG(LOG_ERR, "FATAL: couldn't create server socket, %s", sys_errlist[errno]);
+				exit_server(0);
+			}			
 
 		FD_ZERO(&rfds);
 		FD_SET(server_socket, &rfds);
@@ -164,8 +163,14 @@ int main(int argc, char *argv[])
 			continue;
 		}
 		
-		if ((bytes = get_packet(&packet, server_socket)) < 0) /* this waits for a packet - idle */
+		if ((bytes = get_packet(&packet, server_socket)) < 0) { /* this waits for a packet - idle */
+			if (bytes == -1 && errno != EINTR) {
+				DEBUG(LOG_INFO, "error on read, %s, reopening socket", sys_errlist[errno]);
+				close(server_socket);
+				server_socket = -1;
+			}
 			continue;
+		}
 
 		if ((state = get_option(&packet, DHCP_MESSAGE_TYPE)) == NULL) {
 			DEBUG(LOG_ERR, "couldn't get option from packet, ignoring");

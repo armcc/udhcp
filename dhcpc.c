@@ -51,11 +51,12 @@ static unsigned long requested_ip; /* = 0 */
 static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
+static int fd;
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
 #define LISTEN_RAW 2
-static int listen_mode = LISTEN_RAW;
+static int listen_mode;
 
 #define DEFAULT_SCRIPT	"/usr/share/udhcpc/default.script"
 
@@ -93,6 +94,17 @@ static void print_usage(void)
 }
 
 
+/* just a little helper */
+static void change_mode(int new_mode)
+{
+	DEBUG(LOG_INFO, "entering %s listen mode",
+		new_mode ? (new_mode == 1 ? "kernel" : "raw") : "none");
+	close(fd);
+	fd = -1;
+	listen_mode = new_mode;
+}
+
+
 /* SIGUSR1 handler (renew) */
 static void renew_requested(int sig)
 {
@@ -100,14 +112,14 @@ static void renew_requested(int sig)
 	LOG(LOG_INFO, "Received SIGUSR1");
 	if (state == BOUND || state == RENEWING || state == REBINDING ||
 	    state == RELEASED) {
-	    	listen_mode = LISTEN_KERNEL;
+	    	change_mode(LISTEN_KERNEL);
 		server_addr = 0;
 		packet_num = 0;
 		state = RENEW_REQUESTED;
 	}
 
 	if (state == RELEASED) {
-		listen_mode = LISTEN_RAW;
+		change_mode(LISTEN_RAW);
 		state = INIT_SELECTING;
 	}
 
@@ -127,7 +139,7 @@ static void release_requested(int sig)
 		run_script(NULL, "deconfig");
 	}
 
-	listen_mode = 0;
+	change_mode(LISTEN_NONE);
 	state = RELEASED;
 	timeout = 0xffffffff;
 }
@@ -178,7 +190,7 @@ int main(int argc, char *argv[])
 	unsigned long t1 = 0, t2 = 0, xid = 0;
 	unsigned long start = 0, lease;
 	fd_set rfds;
-	int fd = -1, retval;
+	int retval;
 	struct timeval tv;
 	int c, len;
 	struct dhcpMessage packet;
@@ -270,25 +282,22 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, terminate);
 	
 	state = INIT_SELECTING;
+	change_mode(LISTEN_RAW);
 	run_script(NULL, "deconfig");
 
 	for (;;) {
-		if (fd > 0) {
-			close(fd);
-			fd = -1;
-		}
-		
+
 		tv.tv_sec = timeout - time(0);
 		tv.tv_usec = 0;
 		FD_ZERO(&rfds);
 
-		if (listen_mode != LISTEN_NONE) {
+		if (listen_mode != LISTEN_NONE && fd < 0) {
 			if (listen_mode == LISTEN_KERNEL)
 				fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface);
 			else
 				fd = raw_socket(client_config.ifindex);
 			if (fd < 0) {
-				LOG(LOG_ERR, "FATAL: couldn't listen on socket");
+				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %s", sys_errlist[errno]);
 				exit_client(0);
 			}
 			FD_SET(fd, &rfds);		
@@ -337,13 +346,13 @@ int main(int argc, char *argv[])
 					state = INIT_SELECTING;
 					timeout = now;
 					packet_num = 0;
-					listen_mode = LISTEN_RAW;
+					change_mode(LISTEN_RAW);
 				}
 				break;
 			case BOUND:
 				/* Lease is starting to run out, time to enter renewing state */
 				state = RENEWING;
-				listen_mode = LISTEN_KERNEL;
+				change_mode(LISTEN_KERNEL);
 				DEBUG(LOG_INFO, "Entering renew state");
 				/* fall right through */
 			case RENEWING:
@@ -370,7 +379,7 @@ int main(int argc, char *argv[])
 					run_script(NULL, "deconfig");
 					timeout = now;
 					packet_num = 0;
-					listen_mode = LISTEN_RAW;
+					change_mode(LISTEN_RAW);
 				} else {
 					/* send a request packet */
 					send_renew(xid, 0, requested_ip); /* broadcast */
@@ -387,11 +396,15 @@ int main(int argc, char *argv[])
 		} else if (retval > 0 && listen_mode != LISTEN_NONE && FD_ISSET(fd, &rfds)) {
 			/* a packet is ready, read it */
 			
-			if (listen_mode == LISTEN_KERNEL) {
-				if (get_packet(&packet, fd) < 0) continue;
-			} else {
-				if (get_raw_packet(&packet, fd) < 0) continue;
-			} 
+			if (listen_mode == LISTEN_KERNEL)
+				len = get_packet(&packet, fd);
+			else len = get_raw_packet(&packet, fd);
+			
+			if (len == -1 && errno != EINTR) {
+				DEBUG(LOG_INFO, "error on read, %s, reopening socket", sys_errlist[errno]);
+				change_mode(listen_mode); /* just close and reopen */
+			}
+			if (len < 0) continue;
 			
 			if (packet.xid != xid) {
 				DEBUG(LOG_INFO, "Ignoring XID %lx (our xid is %lx)",
@@ -450,7 +463,7 @@ int main(int argc, char *argv[])
 						   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
 
 					state = BOUND;
-					listen_mode = LISTEN_NONE;
+					change_mode(LISTEN_NONE);
 					background();
 					
 				} else if (*message == DHCPNAK) {
@@ -462,7 +475,7 @@ int main(int argc, char *argv[])
 					timeout = now;
 					requested_ip = 0;
 					packet_num = 0;
-					listen_mode = LISTEN_RAW;
+					change_mode(LISTEN_RAW);
 					sleep(3); /* avoid excessive network traffic */
 				}
 				break;

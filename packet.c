@@ -32,7 +32,7 @@ void init_header(struct dhcpMessage *packet, char type)
 }
 
 
-/* read a packet from socket fd */
+/* read a packet from socket fd, return -1 on read error, -2 on packet error */
 int get_packet(struct dhcpMessage *packet, int fd)
 {
 	int bytes;
@@ -52,7 +52,7 @@ int get_packet(struct dhcpMessage *packet, int fd)
 
 	if (ntohl(packet->cookie) != DHCP_MAGIC) {
 		LOG(LOG_ERR, "received bogus message, ignoring");
-		return -1;
+		return -2;
 	}
 	DEBUG(LOG_INFO, "Received a packet");
 	
