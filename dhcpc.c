@@ -463,6 +463,7 @@ int main(int argc, char *argv[])
 					requested_ip = 0;
 					packet_num = 0;
 					listen_mode = LISTEN_RAW;
+					sleep(3); /* avoid excessive network traffic */
 				}
 				break;
 			/* case BOUND, RELEASED: - ignore all packets */
