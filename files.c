@@ -203,8 +203,8 @@ int read_config(char *file)
 		/* eat leading whitespace */
 		line = line + strspn(line, " \t=");
 		/* eat trailing whitespace */
-		for (i = strlen(line) - 1; i > 0 && isspace(line[i]); i--);
-		line[i > 0 ? i + 1 : 0] = '\0';
+		for (i = strlen(line); i > 0 && isspace(line[i - 1]); i--);
+		line[i] = '\0';
 		
 		for (i = 0; strlen(keywords[i].keyword); i++)
 			if (!strcasecmp(token, keywords[i].keyword))
