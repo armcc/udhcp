@@ -157,8 +157,8 @@ static char **fill_envp(struct dhcpMessage *packet)
 		if (!(over & SNAME_FIELD) && packet->sname[0]) num_options++;		
 	}
 	
-	envp = malloc((num_options + 5) * sizeof(char *));
-	envp[0] = malloc(sizeof("interface=") + strlen(client_config.interface));
+	envp = xmalloc((num_options + 5) * sizeof(char *));
+	envp[0] = xmalloc(sizeof("interface=") + strlen(client_config.interface));
 	sprintf(envp[0], "interface=%s", client_config.interface);
 	envp[1] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
 	envp[2] = find_env("HOME", "HOME=/");
@@ -168,29 +168,29 @@ static char **fill_envp(struct dhcpMessage *packet)
 		return envp;
 	}
 
-	envp[3] = malloc(sizeof("ip=255.255.255.255"));
+	envp[3] = xmalloc(sizeof("ip=255.255.255.255"));
 	sprintip(envp[3], "ip=", (unsigned char *) &packet->yiaddr);
 	for (i = 0, j = 4; options[i].code; i++) {
 		if ((temp = get_option(packet, options[i].code))) {
-			envp[j] = malloc(upper_length(temp[OPT_LEN - 2], &options[i]) + strlen(options[i].name) + 2);
+			envp[j] = xmalloc(upper_length(temp[OPT_LEN - 2], &options[i]) + strlen(options[i].name) + 2);
 			fill_options(envp[j], temp, &options[i]);
 			j++;
 		}
 	}
 	if (packet->siaddr) {
-		envp[j] = malloc(sizeof("siaddr=255.255.255.255"));
+		envp[j] = xmalloc(sizeof("siaddr=255.255.255.255"));
 		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->siaddr);
 	}
 	if (!(over & FILE_FIELD) && packet->file[0]) {
 		/* watch out for invalid packets */
 		packet->file[sizeof(packet->file) - 1] = '\0';
-		envp[j] = malloc(sizeof("boot_file=") + strlen(packet->file));
+		envp[j] = xmalloc(sizeof("boot_file=") + strlen(packet->file));
 		sprintf(envp[j++], "boot_file=%s", packet->file);
 	}
 	if (!(over & SNAME_FIELD) && packet->sname[0]) {
 		/* watch out for invalid packets */
 		packet->sname[sizeof(packet->sname) - 1] = '\0';
-		envp[j] = malloc(sizeof("sname=") + strlen(packet->sname));
+		envp[j] = xmalloc(sizeof("sname=") + strlen(packet->sname));
 		sprintf(envp[j++], "sname=%s", packet->sname);
 	}	
 	envp[j] = NULL;

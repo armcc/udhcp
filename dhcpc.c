@@ -1,4 +1,4 @@
-/* dhcpd.c
+/* dhcpc.c
  *
  * udhcp DHCP client
  *
@@ -76,10 +76,11 @@ struct client_config_t client_config = {
 	arp: "\0\0\0\0\0\0",		/* appease gcc-3.0 */
 };
 
-static void print_usage(void)
+#ifndef BB_VER
+static void show_usage(void)
 {
 	printf(
-"Usage: udhcpcd [OPTIONS]\n\n"
+"Usage: udhcpc [OPTIONS]\n\n"
 "  -c, --clientid=CLIENTID         Client identifier\n"
 "  -H, --hostname=HOSTNAME         Client hostname\n"
 "  -h                              Alias for -H\n"
@@ -96,7 +97,9 @@ static void print_usage(void)
 "                                  " DEFAULT_SCRIPT ")\n"
 "  -v, --version                   Display version\n"
 	);
+	exit(0);
 }
+#endif
 
 
 /* just a little helper */
@@ -198,7 +201,7 @@ static void background(void)
 
 
 #ifdef COMBINED_BINARY
-int udhcpc(int argc, char *argv[])
+int udhcpc_main(int argc, char *argv[])
 #else
 int main(int argc, char *argv[])
 #endif
@@ -217,7 +220,7 @@ int main(int argc, char *argv[])
 	int max_fd;
 	int sig;
 
-	static struct option options[] = {
+	static struct option arg_options[] = {
 		{"clientid",	required_argument,	0, 'c'},
 		{"foreground",	no_argument,		0, 'f'},
 		{"background",	no_argument,		0, 'b'},
@@ -237,14 +240,14 @@ int main(int argc, char *argv[])
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:fbH:h:i:np:qr:s:v", options, &option_index);
+		c = getopt_long(argc, argv, "c:fbH:h:i:np:qr:s:v", arg_options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
 		case 'c':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
 			if (client_config.clientid) free(client_config.clientid);
-			client_config.clientid = malloc(len + 2);
+			client_config.clientid = xmalloc(len + 2);
 			client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
 			client_config.clientid[OPT_LEN] = len;
 			client_config.clientid[OPT_DATA] = '\0';
@@ -260,7 +263,7 @@ int main(int argc, char *argv[])
 		case 'H':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
 			if (client_config.hostname) free(client_config.hostname);
-			client_config.hostname = malloc(len + 2);
+			client_config.hostname = xmalloc(len + 2);
 			client_config.hostname[OPT_CODE] = DHCP_HOST_NAME;
 			client_config.hostname[OPT_LEN] = len;
 			strncpy(client_config.hostname + 2, optarg, len);
@@ -288,8 +291,7 @@ int main(int argc, char *argv[])
 			exit_client(0);
 			break;
 		default:
-			print_usage();
-			return 0;
+			show_usage();
 		}
 	}
 
@@ -304,7 +306,7 @@ int main(int argc, char *argv[])
 		exit_client(1);
 		
 	if (!client_config.clientid) {
-		client_config.clientid = malloc(6 + 3);
+		client_config.clientid = xmalloc(6 + 3);
 		client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
 		client_config.clientid[OPT_LEN] = 7;
 		client_config.clientid[OPT_DATA] = 1;

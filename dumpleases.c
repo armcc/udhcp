@@ -17,6 +17,8 @@
 #include <getopt.h>
 #include <time.h>
 
+#include "libbb_udhcp.h"
+
 #define REMAINING 0
 #define ABSOLUTE 1
 
@@ -26,7 +28,12 @@ struct lease_t {
 	u_int32_t expires;
 };
 
-int main (int argc, char *argv[]) {
+#ifdef BB_VER
+int dumpleases_main(int argc, char *argv[])
+#else
+int main(int argc, char *argv[])
+#endif
+{
 	FILE *fp;
 	int i, c, mode = REMAINING;
 	long expires;
@@ -55,9 +62,9 @@ int main (int argc, char *argv[]) {
 			file[254] = '\0';
 			break;
 		case 'h':
-			printf("Usage: dumpleases -f <file> -[ra]\n\n");
+			printf("Usage: dumpleases -f <file> -[r|a]\n\n");
 			printf("  -f, --file=FILENAME             Leases file to load\n");
-			printf("  -r, --remaining                 Interepret lease times as time reemaing\n");
+			printf("  -r, --remaining                 Interepret lease times as time remaing\n");
 			printf("  -a, --absolute                  Interepret lease times as expire time\n");
 			break;
 		}

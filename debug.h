@@ -1,6 +1,8 @@
 #ifndef _DEBUG_H
 #define _DEBUG_H
 
+#include "libbb_udhcp.h"
+
 #include <stdio.h>
 #ifdef SYSLOG
 #include <syslog.h>

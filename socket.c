@@ -47,7 +47,7 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 {
 	int fd;
 	struct ifreq ifr;
-	struct sockaddr_in *sin;
+	struct sockaddr_in *our_ip;
 
 	memset(&ifr, 0, sizeof(struct ifreq));
 	if((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
@@ -56,9 +56,9 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 
 		if (addr) { 
 			if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
-				sin = (struct sockaddr_in *) &ifr.ifr_addr;
-				*addr = sin->sin_addr.s_addr;
-				DEBUG(LOG_INFO, "%s (our ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
+				our_ip = (struct sockaddr_in *) &ifr.ifr_addr;
+				*addr = our_ip->sin_addr.s_addr;
+				DEBUG(LOG_INFO, "%s (our ip) = %s", ifr.ifr_name, inet_ntoa(our_ip->sin_addr));
 			} else {
 				LOG(LOG_ERR, "SIOCGIFADDR failed, is the interface up and configured?: %s", 
 						strerror(errno));

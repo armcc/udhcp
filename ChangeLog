@@ -1,4 +1,6 @@
 0.9.8 (pending)
++ udhcp now fits nicely into busybox
+  (Glenn McGrath <bug1@optushome.com.au> as well as myself)
 + updated client manpage (me)
 + both client and server now use sockets for signal handling,
   hopefully, this will be the last needed change in signal

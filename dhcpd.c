@@ -76,7 +76,7 @@ static void signal_handler(int sig)
 
 
 #ifdef COMBINED_BINARY	
-int udhcpd(int argc, char *argv[])
+int udhcpd_main(int argc, char *argv[])
 #else
 int main(int argc, char *argv[])
 #endif

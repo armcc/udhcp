@@ -5,6 +5,7 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
+#include "libbb_udhcp.h"
 #include "leases.h"
 
 /************************************/
@@ -86,8 +87,6 @@
 #define SNAME_FIELD		2
 
 /* miscellaneous defines */
-#define TRUE			1
-#define FALSE			0
 #define MAC_BCAST_ADDR		(unsigned char *) "\xff\xff\xff\xff\xff\xff"
 #define OPT_CODE 0
 #define OPT_LEN 1

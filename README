@@ -184,3 +184,13 @@ options.c contains a set of dhcp options for the client:
 	by the client (OPTION_REQ)
 
 	code: The DHCP code for this option
+
+busybox drop-in
+--------------
+udhcp is now a drop-in component for busybox (http://busybox.net).
+To update busybox to the latest revision, simply do a:
+
+cp *.[ch] <busybox_source>/networking/udhcp
+
+The only two files udhcp does not provide are config.in and
+Makefile.in, so these may need to be updated from time to time.
