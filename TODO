@@ -1,9 +1,6 @@
 TODO
 ----
 + DONE: Make sure get_raw_packet only accepts packets on the specified interface
-+ FIXED: little/big endian issue probable cause for segmentation fault on i86 platform
-+ N/A: makeiplist basic functionality works.. more user friendly interface required
-+ REPLACED: browseiplist incomplete
 + better standard linux distro support
 + make config file a command line option for server
 + IMPLEMENTED: make forking a command line option
@@ -12,4 +9,6 @@ TODO
 + Hooks within the DHCP server
 + Additional bootp support in client/server
 + Make serverid option in server configurable
-+ cause client to generate DHCP_VENDOR option
++ DONE: cause client to generate DHCP_VENDOR option
++ Possibly add failure message to DHCP NAK
++ Possibly log DHCP NAK failure message in client

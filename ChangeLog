@@ -1,6 +1,7 @@
 0.9.6 (pending)
 + Added bootp paramaters to server (me)
 + Added bootp paramaters to client (me)
++ Added vendor id to client (me)
 
 0.9.5 (010914)
 + Fixed $HOME and $PATH env passing (me)

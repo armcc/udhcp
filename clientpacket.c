@@ -59,6 +59,11 @@ unsigned long random_xid(void)
 /* initialize a packet with the proper defaults */
 static void init_packet(struct dhcpMessage *packet, char type)
 {
+	struct vendor  {
+		char vendor, length;
+		char str[sizeof("uDHCP "VERSION)];
+	} vendor_id = { DHCP_VENDOR,  sizeof("uDHCP "VERSION) - 1, "uDHCP "VERSION};
+	
 	memset(packet, 0, sizeof(struct dhcpMessage));
 	
 	packet->op = BOOTREQUEST;
@@ -70,6 +75,7 @@ static void init_packet(struct dhcpMessage *packet, char type)
 	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
 	if (client_config.clientid) add_option_string(packet->options, client_config.clientid);
 	if (client_config.hostname) add_option_string(packet->options, client_config.hostname);
+	add_option_string(packet->options, (char *) &vendor_id);
 }
 
 
