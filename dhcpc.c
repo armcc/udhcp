@@ -113,17 +113,25 @@ static void renew_requested(int sig)
 {
 	sig = 0;
 	LOG(LOG_INFO, "Received SIGUSR1");
-	if (state == BOUND || state == RENEWING || state == REBINDING ||
-	    state == RELEASED) {
-	    	change_mode(LISTEN_KERNEL);
-		packet_num = 0;
+	switch (state) {
+	case RENEWING:
+		run_script(NULL, "deconfig");
+	case BOUND:
+	case REBINDING:
+		change_mode(LISTEN_KERNEL);
 		state = RENEW_REQUESTED;
-	}
-
-	if (state == RELEASED) {
+		break;
+	case RENEW_REQUESTED:
+	case REQUESTING:
+	case RELEASED:
 		change_mode(LISTEN_RAW);
 		state = INIT_SELECTING;
+		break;
+	case INIT_SELECTING:
 	}
+
+	/* start things over */
+	packet_num = 0;
 
 	/* Kill any timeouts because the user wants this to hurry along */
 	timeout = 0;
