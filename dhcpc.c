@@ -19,9 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
  
-#include <stdio.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <sys/file.h>
 #include <unistd.h>
 #include <getopt.h>
@@ -40,11 +38,11 @@
 #include "dhcpc.h"
 #include "options.h"
 #include "clientpacket.h"
-#include "packet.h"
+#include "clientsocket.h"
 #include "script.h"
 #include "socket.h"
-#include "debug.h"
-#include "pidfile.h"
+#include "common.h"
+#include "signalpipe.h"
 
 static int state;
 static unsigned long requested_ip; /* = 0 */
@@ -52,14 +50,11 @@ static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
 static int fd = -1;
-static int signal_pipe[2];
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
 #define LISTEN_RAW 2
 static int listen_mode;
-
-#define DEFAULT_SCRIPT	"/usr/share/udhcpc/default.script"
 
 struct client_config_t client_config = {
 	/* Default options. */
@@ -135,6 +130,7 @@ static void perform_renew(void)
 		state = INIT_SELECTING;
 		break;
 	case INIT_SELECTING:
+		break;
 	}
 
 	/* start things over */
@@ -169,38 +165,11 @@ static void perform_release(void)
 }
 
 
-/* Exit and cleanup */
-static void exit_client(int retval)
+static void client_background(void)
 {
-	pidfile_delete(client_config.pidfile);
-	CLOSE_LOG();
-	exit(retval);
-}
-
-
-/* Signal handler */
-static void signal_handler(int sig)
-{
-	if (send(signal_pipe[1], &sig, sizeof(sig), MSG_DONTWAIT) < 0) {
-		LOG(LOG_ERR, "Could not send signal: %s",
-			strerror(errno));
-	}
-}
-
-
-static void background(void)
-{
-	int pid_fd;
-
-	pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
-	while (pid_fd >= 0 && pid_fd < 3) pid_fd = dup(pid_fd); /* don't let daemon close it */
-	if (daemon(0, 0) == -1) {
-		perror("fork");
-		exit_client(1);
-	}
+	background(client_config.pidfile);
 	client_config.foreground = 1; /* Do not fork again. */
 	client_config.background_if_no_lease = 0;
-	pidfile_write_release(pid_fd);
 }
 
 
@@ -219,12 +188,11 @@ int main(int argc, char *argv[])
 	int c, len;
 	struct dhcpMessage packet;
 	struct in_addr temp_addr;
-	int pid_fd;
 	time_t now;
 	int max_fd;
 	int sig;
 
-	static struct option arg_options[] = {
+	static const struct option arg_options[] = {
 		{"clientid",	required_argument,	0, 'c'},
 		{"foreground",	no_argument,		0, 'f'},
 		{"background",	no_argument,		0, 'b'},
@@ -237,7 +205,6 @@ int main(int argc, char *argv[])
 		{"request",	required_argument,	0, 'r'},
 		{"script",	required_argument,	0, 's'},
 		{"version",	no_argument,		0, 'v'},
-		{"help",	no_argument,		0, '?'},
 		{0, 0, 0, 0}
 	};
 
@@ -292,22 +259,19 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			printf("udhcpcd, version %s\n\n", VERSION);
-			exit_client(0);
+			return 0;
 			break;
 		default:
 			show_usage();
 		}
 	}
 
-	OPEN_LOG("udhcpc");
-	LOG(LOG_INFO, "udhcp client (v%s) started", VERSION);
-
-	pid_fd = pidfile_acquire(client_config.pidfile);
-	pidfile_write_release(pid_fd);
+	/* Start the log, sanitize fd's, and write a pid file */
+	start_log_and_pid("udhcpc", client_config.pidfile);
 
 	if (read_interface(client_config.interface, &client_config.ifindex, 
 			   NULL, client_config.arp) < 0)
-		exit_client(1);
+		return 1;
 		
 	if (!client_config.clientid) {
 		client_config.clientid = xmalloc(6 + 3);
@@ -317,11 +281,8 @@ int main(int argc, char *argv[])
 		memcpy(client_config.clientid + 3, client_config.arp, 6);
 	}
 
-	/* setup signal handlers */
-	socketpair(AF_UNIX, SOCK_STREAM, 0, signal_pipe);
-	signal(SIGUSR1, signal_handler);
-	signal(SIGUSR2, signal_handler);
-	signal(SIGTERM, signal_handler);
+	/* setup the signal pipe */
+	udhcp_sp_setup();	
 	
 	state = INIT_SELECTING;
 	run_script(NULL, "deconfig");
@@ -331,7 +292,6 @@ int main(int argc, char *argv[])
 
 		tv.tv_sec = timeout - time(0);
 		tv.tv_usec = 0;
-		FD_ZERO(&rfds);
 
 		if (listen_mode != LISTEN_NONE && fd < 0) {
 			if (listen_mode == LISTEN_KERNEL)
@@ -339,16 +299,14 @@ int main(int argc, char *argv[])
 			else
 				fd = raw_socket(client_config.ifindex);
 			if (fd < 0) {
-				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %s", strerror(errno));
-				exit_client(0);
+				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %m");
+				return 0;
 			}
 		}
-		if (fd >= 0) FD_SET(fd, &rfds);
-		FD_SET(signal_pipe[0], &rfds);		
+		max_fd = udhcp_sp_fd_set(&rfds, fd);
 
 		if (tv.tv_sec > 0) {
-			DEBUG(LOG_INFO, "Waiting on select...\n");
-			max_fd = signal_pipe[0] > fd ? signal_pipe[0] : fd;
+			DEBUG(LOG_INFO, "Waiting on select...");
 			retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
 		} else retval = 0; /* If we already timed out, fall through */
 
@@ -367,12 +325,13 @@ int main(int argc, char *argv[])
 					timeout = now + ((packet_num == 2) ? 4 : 2);
 					packet_num++;
 				} else {
+					run_script(NULL, "leasefail");
 					if (client_config.background_if_no_lease) {
 						LOG(LOG_INFO, "No lease, forking to background.");
-						background();
+						client_background();
 					} else if (client_config.abort_if_no_lease) {
 						LOG(LOG_INFO, "No lease, failing.");
-						exit_client(1);
+						return 1;
 				  	}
 					/* wait to try again */
 					packet_num = 0;
@@ -450,7 +409,7 @@ int main(int argc, char *argv[])
 			else len = get_raw_packet(&packet, fd);
 			
 			if (len == -1 && errno != EINTR) {
-				DEBUG(LOG_INFO, "error on read, %s, reopening socket", strerror(errno));
+				DEBUG(LOG_INFO, "error on read, %m, reopening socket");
 				change_mode(listen_mode); /* just close and reopen */
 			}
 			if (len < 0) continue;
@@ -514,9 +473,9 @@ int main(int argc, char *argv[])
 					state = BOUND;
 					change_mode(LISTEN_NONE);
 					if (client_config.quit_after_lease) 
-						exit_client(0);
+						return 0;
 					if (!client_config.foreground)
-						background();
+						client_background();
 
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
@@ -534,12 +493,7 @@ int main(int argc, char *argv[])
 				break;
 			/* case BOUND, RELEASED: - ignore all packets */
 			}	
-		} else if (retval > 0 && FD_ISSET(signal_pipe[0], &rfds)) {
-			if (read(signal_pipe[0], &sig, sizeof(sig)) < 0) {
-				DEBUG(LOG_ERR, "Could not read signal: %s", 
-					strerror(errno));
-				continue; /* probably just EINTR */
-			}
+		} else if (retval > 0 && (sig = udhcp_sp_read(&rfds))) {
 			switch (sig) {
 			case SIGUSR1: 
 				perform_renew();
@@ -549,7 +503,7 @@ int main(int argc, char *argv[])
 				break;
 			case SIGTERM:
 				LOG(LOG_INFO, "Received SIGTERM");
-				exit_client(0);
+				return 0;
 			}
 		} else if (retval == -1 && errno == EINTR) {
 			/* a signal was caught */		
@@ -561,4 +515,3 @@ int main(int argc, char *argv[])
 	}
 	return 0;
 }
-

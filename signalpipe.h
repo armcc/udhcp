@@ -1,8 +1,6 @@
-/* pidfile.h
+/* signalpipe.h
  *
- * Functions to assist in the writing and removing of pidfiles.
- *
- * Russ Dill <Russ.Dill@asu.edu> Soptember 2001
+ * Russ Dill <Russ.Dill@asu.edu> December 2003
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +17,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-
-int pidfile_acquire(const char *pidfile);
-void pidfile_write_release(int pid_fd);
-
+void udhcp_sp_setup(void);
+int udhcp_sp_fd_set(fd_set *rfds, int extra_fd);
+int udhcp_sp_read(fd_set *rfds);

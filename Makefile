@@ -8,22 +8,22 @@ USRSHAREDIR=${prefix}/share
 
 # Uncomment this to get a shared binary. Call as udhcpd for the server,
 # and udhcpc for the client
-#COMBINED_BINARY=1
+COMBINED_BINARY=1
 
 # Uncomment this for extra output and to compile with debugging symbols
-#DEBUG=1
+#UDHCP_DEBUG=1
 
 # Uncomment this to output messages to syslog, otherwise, messages go to stdout
-CFLAGS += -DSYSLOG
+#CFLAGS += -DUDHCP_SYSLOG
 
 #CROSS_COMPILE=arm-uclibc-
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 INSTALL = install
 
-OBJS_SHARED = options.o socket.o packet.o pidfile.o
+OBJS_SHARED = common.o options.o packet.o pidfile.o signalpipe.o socket.o
 DHCPD_OBJS = dhcpd.o arpping.o files.o leases.o serverpacket.o
-DHCPC_OBJS = dhcpc.o clientpacket.o script.o
+DHCPC_OBJS = dhcpc.o clientpacket.o clientsocket.o script.o
 
 ifdef COMBINED_BINARY
 EXEC1 = udhcpd
@@ -44,14 +44,14 @@ BOOT_PROGRAMS = udhcpc
 DAEMONS = udhcpd
 COMMANDS = dumpleases
 
-ifdef SYSLOG
-CFLAGS += -DSYSLOG
+ifdef UDHCP_SYSLOG
+CFLAGS += -DUDHCP_SYSLOG
 endif
 
-CFLAGS += -W -Wall -Wstrict-prototypes
+CFLAGS += -W -Wall -Wstrict-prototypes -D_GNU_SOURCE
 
-ifdef DEBUG
-CFLAGS += -g -DDEBUG
+ifdef UDHCP_DEBUG
+CFLAGS += -g -DUDHCP_DEBUG
 STRIP=true
 else
 CFLAGS += -Os -fomit-frame-pointer

@@ -35,17 +35,14 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 
 
 #include "dhcpd.h"
-#include "packet.h"
+#include "clientpacket.h"
 #include "options.h"
 #include "dhcpc.h"
-#include "debug.h"
+#include "common.h"
 
 
 /* Create a random xid */
@@ -58,8 +55,7 @@ unsigned long random_xid(void)
 
 		fd = open("/dev/urandom", 0);
 		if (fd < 0 || read(fd, &seed, sizeof(seed)) < 0) {
-			LOG(LOG_WARNING, "Could not load seed from /dev/urandom: %s",
-				strerror(errno));
+			LOG(LOG_WARNING, "Could not load seed from /dev/urandom: %m");
 			seed = time(0);
 		}
 		if (fd >= 0) close(fd);
@@ -95,9 +91,9 @@ static void add_requests(struct dhcpMessage *packet)
 	int i, len = 0;
 
 	packet->options[end + OPT_CODE] = DHCP_PARAM_REQ;
-	for (i = 0; options[i].code; i++)
-		if (options[i].flags & OPTION_REQ)
-			packet->options[end + OPT_DATA + len++] = options[i].code;
+	for (i = 0; dhcp_options[i].code; i++)
+		if (dhcp_options[i].flags & OPTION_REQ)
+			packet->options[end + OPT_DATA + len++] = dhcp_options[i].code;
 	packet->options[end + OPT_LEN] = len;
 	packet->options[end + OPT_DATA + len] = DHCP_END;
 
@@ -250,4 +246,3 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 	return bytes - (sizeof(packet.ip) + sizeof(packet.udp));
 	
 }
-

@@ -3,19 +3,17 @@
  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
  */
  
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "debug.h"
 #include "dhcpd.h"
 #include "files.h"
 #include "options.h"
-#include "leases.h"
+#include "common.h"
 
 
 /* supported options are easily added here */
-struct dhcp_option options[] = {
+struct dhcp_option dhcp_options[] = {
 	/* name[10]	flags					code */
 	{"subnet",	OPTION_IP | OPTION_REQ,			0x01},
 	{"timezone",	OPTION_S32,				0x02},
@@ -160,9 +158,9 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 	u16 = (u_int16_t *) &aligned;
 	u32 = &aligned;
 
-	for (i = 0; options[i].code; i++)
-		if (options[i].code == code) {
-			length = option_lengths[options[i].flags & TYPE_MASK];
+	for (i = 0; dhcp_options[i].code; i++)
+		if (dhcp_options[i].code == code) {
+			length = option_lengths[dhcp_options[i].flags & TYPE_MASK];
 		}
 		
 	if (!length) {
