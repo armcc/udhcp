@@ -151,6 +151,13 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 	char length = 0;
 	int i;
 	char option[2 + 4];
+	unsigned char *u8;
+	u_int16_t *u16;
+	u_int32_t *u32;
+	u_int32_t aligned;
+	u8 = (unsigned char *) &aligned;
+	u16 = (u_int16_t *) &aligned;
+	u32 = &aligned;
 
 	for (i = 0; options[i].code; i++)
 		if (options[i].code == code) {
@@ -166,10 +173,11 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 	option[OPT_LEN] = length;
 
 	switch (length) {
-		case 1: option[2] = (char) data; break;
-		case 2: *((u_int16_t *) (option + 2)) = data; break;
-		case 4: *((u_int32_t *) (option + 2)) = data; break;
+		case 1: *u8 =  data; break;
+		case 2: *u16 = data; break;
+		case 4: *u32 = data; break;
 	}
+	memcpy(option + 2, &aligned, length);
 	return add_option_string(optionptr, option);
 }
 
