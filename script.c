@@ -50,6 +50,11 @@ static int max_option_length[] = {
 	[OPTION_S32] =		sizeof("-2147483684 "),
 };
 
+static int upper_length(unsigned char *option)
+{
+	return max_option_length[option[OPT_CODE - 2] & TYPE_MASK] *
+	       (option[OPT_LEN - 2] / option_lengths[option[OPT_CODE - 2] & TYPE_MASK]);
+}
 
 static int sprintip(char *dest, char *pre, unsigned char *ip) {
 	return sprintf(dest, "%s%d.%d.%d.%d ", pre, ip[0], ip[1], ip[2], ip[3]);
@@ -164,7 +169,7 @@ static char **fill_envp(struct dhcpMessage *packet)
 	sprintip(envp[3], "ip=", (unsigned char *) &packet->yiaddr);
 	for (i = 0, j = 4; options[i].code; i++) {
 		if ((temp = get_option(packet, options[i].code))) {
-			envp[j] = malloc(max_option_length[options[i].flags & TYPE_MASK] + strlen(options[i].name) + 2);
+			envp[j] = malloc(upper_length(temp) + strlen(options[i].name) + 2);
 			fill_options(envp[j], temp, &options[i]);
 			j++;
 		}
