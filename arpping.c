@@ -84,7 +84,7 @@ int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *mac, char *interface)
 		FD_SET(s, &fdset);
 		tm.tv_sec = timeout;
 		if (select(s + 1, &fdset, (fd_set *) NULL, (fd_set *) NULL, &tm) < 0) {
-			DEBUG(LOG_ERR, "Error on ARPING request: %s", sys_errlist[errno]);
+			DEBUG(LOG_ERR, "Error on ARPING request: %s", strerror(errno));
 			if (errno != EINTR) rv = 0;
 		} else if (FD_ISSET(s, &fdset)) {
 			if (recv(s, &arp, sizeof(arp), 0) < 0 ) rv = 0;

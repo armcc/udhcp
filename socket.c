@@ -60,7 +60,7 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 				*addr = sin->sin_addr.s_addr;
 				DEBUG(LOG_INFO, "%s (our ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
 			} else {
-				LOG(LOG_ERR, "SIOCGIFADDR failed!: %s", sys_errlist[errno]);
+				LOG(LOG_ERR, "SIOCGIFADDR failed!: %s", strerror(errno));
 				return -1;
 			}
 		}
@@ -69,7 +69,7 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
 			*ifindex = ifr.ifr_ifindex;
 		} else {
-			LOG(LOG_ERR, "SIOCGIFINDEX failed!: %s", sys_errlist[errno]);
+			LOG(LOG_ERR, "SIOCGIFINDEX failed!: %s", strerror(errno));
 			return -1;
 		}
 		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
@@ -77,11 +77,11 @@ int read_interface(char *interface, int *ifindex, u_int32_t *addr, unsigned char
 			DEBUG(LOG_INFO, "adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
 				arp[0], arp[1], arp[2], arp[3], arp[4], arp[5]);
 		} else {
-			LOG(LOG_ERR, "SIOCGIFHWADDR failed!: %s", sys_errlist[errno]);
+			LOG(LOG_ERR, "SIOCGIFHWADDR failed!: %s", strerror(errno));
 			return -1;
 		}
 	} else {
-		LOG(LOG_ERR, "socket failed!: %s", sys_errlist[errno]);
+		LOG(LOG_ERR, "socket failed!: %s", strerror(errno));
 		return -1;
 	}
 	close(fd);
@@ -98,7 +98,7 @@ int listen_socket(unsigned int ip, int port, char *inf)
 
 	DEBUG(LOG_INFO, "Opening listen socket on 0x%08x:%d %s\n", ip, port, inf);
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
-		DEBUG(LOG_ERR, "socket call failed: %s", sys_errlist[errno]);
+		DEBUG(LOG_ERR, "socket call failed: %s", strerror(errno));
 		return -1;
 	}
 	
@@ -138,7 +138,7 @@ int raw_socket(int ifindex)
 
 	DEBUG(LOG_INFO, "Opening raw socket on ifindex %d\n", ifindex);
 	if ((fd = socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP))) < 0) {
-		DEBUG(LOG_ERR, "socket call failed: %s", sys_errlist[errno]);
+		DEBUG(LOG_ERR, "socket call failed: %s", strerror(errno));
 		return -1;
 	}
 	
@@ -146,7 +146,7 @@ int raw_socket(int ifindex)
 	sock.sll_protocol = htons(ETH_P_IP);
 	sock.sll_ifindex = ifindex;
 	if (bind(fd, (struct sockaddr *) &sock, sizeof(sock)) < 0) {
-		DEBUG(LOG_ERR, "bind call failed: %s", sys_errlist[errno]);
+		DEBUG(LOG_ERR, "bind call failed: %s", strerror(errno));
 		close(fd);
 		return -1;
 	}

@@ -222,7 +222,7 @@ void run_script(struct dhcpMessage *packet, const char *name)
 		execle(client_config.script, client_config.script,
 		       name, NULL, envp);
 		LOG(LOG_ERR, "script %s failed: %s",
-		    client_config.script, sys_errlist[errno]);
+		    client_config.script, strerror(errno));
 		exit(1);
 	}			
 }

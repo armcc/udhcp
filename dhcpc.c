@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
 			else
 				fd = raw_socket(client_config.ifindex);
 			if (fd < 0) {
-				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %s", sys_errlist[errno]);
+				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %s", strerror(errno));
 				exit_client(0);
 			}
 		}
@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
 			else len = get_raw_packet(&packet, fd);
 			
 			if (len == -1 && errno != EINTR) {
-				DEBUG(LOG_INFO, "error on read, %s, reopening socket", sys_errlist[errno]);
+				DEBUG(LOG_INFO, "error on read, %s, reopening socket", strerror(errno));
 				change_mode(listen_mode); /* just close and reopen */
 			}
 			if (len < 0) continue;
