@@ -1,5 +1,5 @@
 #!/bin/sh
-# Sample udhcpc bound script
+# Sample udhcpc renew script
 
 RESOLV_CONF="/etc/udhcpc/resolv.conf"
 
