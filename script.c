@@ -205,10 +205,30 @@ static char **fill_envp(struct dhcpMessage *packet)
 /* Call the deconfic script */
 void script_deconfig(void)
 {
+	int pid;
+	char **envp;
 	char file[255 + 5];
-	sprintf(file, "%s%sdeconfig", client_config.dir, client_config.prefix);
-	if (system(file) < 0)
+
+	/* call script */
+	pid = fork();	
+	if (pid) {
+		waitpid(pid, NULL, 0);
+		return;
+	} else if (pid == 0) {
+		envp = malloc(sizeof(char *) * 2);
+		envp[0] = malloc(strlen("interface=") + strlen(client_config.interface) + 1);
+		sprintf(envp[0], "interface=%s", client_config.interface);
+		envp[1] = NULL;
+		
+		/* close fd's? */
+		
+		/* exec script */
+		sprintf(file, "%s%sdeconfig", client_config.dir, client_config.prefix);
+		DEBUG(LOG_INFO, "execle'ing %s", file);
+		execle(file, "deconfig", NULL, envp);
 		LOG(LOG_ERR, "script %s failed: %s", file, sys_errlist[errno]);
+		exit(0);
+	}			
 }
 
 

@@ -139,14 +139,14 @@ int main(int argc, char *argv[])
 		switch (c) {
 		case 'd':
 			if (client_config.dir) free(client_config.dir);
-			client_config.dir = strdup(optarg);
+			client_config.dir = malloc(strlen(optarg + 2));
+			strcpy(client_config.dir, optarg);
+			if (optarg[strlen(optarg)] != '/')
+				strcat(client_config.dir, "/");
 			break;
 		case 'p': 
 			if (client_config.prefix) free(client_config.prefix);
-			client_config.prefix = malloc(strlen(optarg + 2));
-			strcpy(client_config.prefix, optarg);
-			if (optarg[strlen(optarg)] != '/')
-				strcat(client_config.prefix, "/");
+			client_config.prefix = strdup(optarg);
 			break;
 		case 'i':
 			strncpy(client_config.interface, optarg, 10);
