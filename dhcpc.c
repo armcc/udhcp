@@ -113,7 +113,6 @@ static void renew_requested(int sig)
 	if (state == BOUND || state == RENEWING || state == REBINDING ||
 	    state == RELEASED) {
 	    	change_mode(LISTEN_KERNEL);
-		server_addr = 0;
 		packet_num = 0;
 		state = RENEW_REQUESTED;
 	}
@@ -141,7 +140,7 @@ static void release_requested(int sig)
 
 	change_mode(LISTEN_NONE);
 	state = RELEASED;
-	timeout = 0xffffffff;
+	timeout = 0x7fffffff;
 }
 
 
@@ -400,7 +399,7 @@ int main(int argc, char *argv[])
 				break;
 			case RELEASED:
 				/* yah, I know, *you* say it would never happen */
-				timeout = 0xffffffff;
+				timeout = 0x7fffffff;
 				break;
 			}
 		} else if (retval > 0 && listen_mode != LISTEN_NONE && FD_ISSET(fd, &rfds)) {
