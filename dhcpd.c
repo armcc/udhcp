@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
 
 		if (server_socket < 0)
 			if ((server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface)) < 0) {
-				LOG(LOG_ERR, "FATAL: couldn't create server socket, %s", sys_errlist[errno]);
+				LOG(LOG_ERR, "FATAL: couldn't create server socket, %s", strerror(errno));
 				exit_server(0);
 			}			
 
@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
 		
 		if ((bytes = get_packet(&packet, server_socket)) < 0) { /* this waits for a packet - idle */
 			if (bytes == -1 && errno != EINTR) {
-				DEBUG(LOG_INFO, "error on read, %s, reopening socket", sys_errlist[errno]);
+				DEBUG(LOG_INFO, "error on read, %s, reopening socket", strerror(errno));
 				close(server_socket);
 				server_socket = -1;
 			}

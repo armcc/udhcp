@@ -1,3 +1,6 @@
+0.9.8 (pending)
++ change sys_errlist[] to strerror() as it aparently doesn't exist
+
 0.9.7 (020526)
 + Use add_lease in read_leases, sanitizes leases more, and clears out exprired
   ones if there is no more room (me)
