@@ -186,10 +186,18 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 		return -1;
 	}
 	
+	if (bytes < ntohs(packet.ip.tot_len)) {
+		DEBUG(LOG_INFO, "Truncated packet");
+		return -1;
+	}
+	
+	/* ignore any extra garbage bytes */
+	bytes = ntohs(packet.ip.tot_len);
+	
 	/* Make sure its the right packet for us, and that it passes sanity checks */
 	if (packet.ip.protocol != IPPROTO_UDP || packet.ip.version != IPVERSION ||
 	    packet.ip.ihl != sizeof(packet.ip) >> 2 || packet.udp.dest != htons(CLIENT_PORT) ||
-	    ntohs(packet.ip.tot_len) != bytes || bytes > (int) sizeof(struct udp_dhcp_packet) ||
+	    bytes > (int) sizeof(struct udp_dhcp_packet) ||
 	    ntohs(packet.udp.len) != (short) (bytes - sizeof(packet.ip))) {
 	    	DEBUG(LOG_INFO, "unrelated/bogus packet");
 	    	return -1;
@@ -214,7 +222,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 	packet.ip.saddr = source;
 	packet.ip.daddr = dest;
 	packet.ip.tot_len = packet.udp.len; /* cheat on the psuedo-header */
-	if (check != checksum(&packet, bytes)) {
+	if (check && check != checksum(&packet, bytes)) {
 		DEBUG(LOG_ERR, "packet with bad UDP checksum received, ignoring");
 		return -1;
 	}
