@@ -169,6 +169,7 @@ static void background(void)
 		exit_client(0);
 	} else if (!client_config.foreground) {
 		pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
+		while (pid_fd >= 0 && pid_fd < 3) pid_fd = dup(pid_fd); /* don't let daemon close it */
 		if (daemon(0, 0) == -1) {
 			perror("fork");
 			exit_client(1);
