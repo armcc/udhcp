@@ -97,6 +97,9 @@ The paramaters for enviromental variables are as follows:
 	$1		- What action the script should perform
 	interface	- The interface this was obtained on
 	ip		- The obtained IP
+	siaddr		- The bootp next server option
+	sname		- The bootp server name option
+	boot_file	- The bootp boot file option
 	subnet		- The assigend subnet mask
 	timezone	- Offset in seconds from UTC
 	router		- A list of routers

@@ -158,6 +158,7 @@ static char **fill_envp(struct dhcpMessage *packet)
 	int i, j;
 	unsigned char *addr;
 	char **envp, *temp;
+	char over = 0;
 
 	if (packet == NULL)
 		num_options = 0;
@@ -165,6 +166,11 @@ static char **fill_envp(struct dhcpMessage *packet)
 		for (i = 0; options[i].code; i++)
 			if (get_option(packet, options[i].code))
 				num_options++;
+		if (packet->siaddr) num_options++;
+		if ((temp = get_option(packet, DHCP_OPTION_OVER)))
+			over = *temp;
+		if (!(over & FILE_FIELD) && packet->file[0]) num_options++;
+		if (!(over & SNAME_FIELD) && packet->sname[0]) num_options++;		
 	}
 	
 	envp = malloc((num_options + 5) * sizeof(char *));
@@ -179,7 +185,7 @@ static char **fill_envp(struct dhcpMessage *packet)
 		return envp;
 	}
 
-	addr = (unsigned char*) &packet->yiaddr;
+	addr = (unsigned char *) &packet->yiaddr;
 	sprintf(envp[1], "ip=%d.%d.%d.%d",
 		addr[0], addr[1], addr[2], addr[3]);
 	for (i = 0, j = 4; options[i].code; i++) {
@@ -189,7 +195,25 @@ static char **fill_envp(struct dhcpMessage *packet)
 			fill_options(envp[j], temp, &options[i]);
 			j++;
 		}
-	}		
+	}
+	if (packet->siaddr) {
+		envp[j] = malloc(sizeof("siaddr=255.255.255.255"));
+		addr = (unsigned char *) &packet->yiaddr;
+		sprintf(envp[j++], "siaddr=%d.%d.%d.%d",
+			addr[0], addr[1], addr[2], addr[3]);
+	}
+	if (!(over & FILE_FIELD) && packet->file[0]) {
+		/* watch out for invalid packets */
+		packet->file[sizeof(packet->file) - 1] = '\0';
+		envp[j] = malloc(sizeof("boot_file=") + strlen(packet->file));
+		sprintf(envp[j++], "boot_file=%s", packet->file);
+	}
+	if (!(over & SNAME_FIELD) && packet->sname[0]) {
+		/* watch out for invalid packets */
+		packet->sname[sizeof(packet->sname) - 1] = '\0';
+		envp[j] = malloc(sizeof("sname=") + strlen(packet->sname));
+		sprintf(envp[j++], "sname=%s", packet->sname);
+	}	
 	envp[j] = NULL;
 	return envp;
 }
