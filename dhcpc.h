@@ -13,16 +13,6 @@
 #define RELEASED	7
 
 
-/* Paramaters the client should request from the server */
-#define PARM_REQUESTS \
-	DHCP_SUBNET, \
-	DHCP_ROUTER, \
-	DHCP_DNS_SERVER, \
-	DHCP_HOST_NAME, \
-	DHCP_DOMAIN_NAME, \
-	DHCP_BROADCAST
-
-
 struct client_config_t {
 	char foreground;		/* Do not fork */
 	char quit_after_lease;		/* Quit after obtaining lease */

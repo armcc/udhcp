@@ -1,4 +1,6 @@
 0.9.7 (pending)
++ Generate the paramaters request list by seeing what options in options.c are
+  ored with OPTION_REQ in options.c
 + Fix dhcp renew forgetfullness on client (bug #1230)
 + Fix dhcp release bug on client (bug #1231)
 + Set option request list for DHCP renew (bug #1233)

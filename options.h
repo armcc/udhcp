@@ -18,7 +18,8 @@ enum {
 	OPTION_S32
 };
 
-#define OPTION_LIST	0x80
+#define OPTION_REQ	0x10
+#define OPTION_LIST	0x20
 
 struct dhcp_option {
 	char name[10];

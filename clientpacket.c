@@ -72,13 +72,21 @@ static void init_packet(struct dhcpMessage *packet, char type)
 }
 
 
-/* Add a paramater request list for stubborn DHCP servers */
+/* Add a paramater request list for stubborn DHCP servers. Pull the data
+ * from the struct in options.c. Don't do bounds checking here because it
+ * goes towards the head of the packet. */
 static void add_requests(struct dhcpMessage *packet)
 {
-	char request_list[] = {DHCP_PARAM_REQ, 0, PARM_REQUESTS};
-	
-	request_list[OPT_LEN] = sizeof(request_list) - 2;
-	add_option_string(packet->options, request_list);
+	int end = end_option(packet->options);
+	int i, len = 0;
+
+	packet->options[end + OPT_CODE] = DHCP_PARAM_REQ;
+	for (i = 0; options[i].code; i++)
+		if (options[i].flags & OPTION_REQ)
+			packet->options[end + OPT_DATA + len++] = options[i].code;
+	packet->options[end + OPT_LEN] = len;
+	packet->options[end + OPT_DATA + len] = DHCP_END;
+
 }
 
 
