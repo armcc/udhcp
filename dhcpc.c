@@ -198,6 +198,7 @@ static void background(void)
 		exit_client(1);
 	}
 	client_config.foreground = 1; /* Do not fork again. */
+	client_config.background_if_no_lease = 0;
 	pidfile_write_release(pid_fd);
 }
 
