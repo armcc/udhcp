@@ -207,6 +207,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	close(fd);
+	fd = -1;
 
 	/* setup signal handlers */
 	signal(SIGUSR1, renew_requested);
@@ -224,7 +225,11 @@ int main(int argc, char *argv[])
 #endif
 
 	for (;;) {
-	
+		if (fd > 0) {
+			close(fd);
+			fd = -1;
+		}
+		
 		if (listen_mode == LISTEN_KERNEL) {
 			if ((fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface)) < 0) {
 				LOG(LOG_ERR, "couldn't create server socket -- au revoir");
@@ -419,7 +424,6 @@ int main(int argc, char *argv[])
 			DEBUG(LOG_ERR, "Error on select");
 		}
 		
-		if (fd > 0) close(fd);
 	}
 	return 0;
 }
