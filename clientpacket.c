@@ -32,6 +32,7 @@
 #endif
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 
 #include "dhcpd.h"
@@ -70,7 +71,17 @@ static void init_packet(struct dhcpMessage *packet, char type)
 }
 
 
-/* Broadcas a DHCP discover packet to the network, with an optionally requested IP */
+/* Add a paramater request list for stubborn DHCP servers */
+static void add_requests(struct dhcpMessage *packet)
+{
+	char request_list[] = {DHCP_PARAM_REQ, 0, PARM_REQUESTS};
+	
+	request_list[OPT_LEN] = sizeof(request_list) - 2;
+	add_option_string(packet->options, request_list);
+}
+
+
+/* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
 int send_discover(unsigned long xid, unsigned long requested)
 {
 	struct dhcpMessage packet;
@@ -80,6 +91,7 @@ int send_discover(unsigned long xid, unsigned long requested)
 	if (requested)
 		add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(requested));
 
+	add_requests(&packet);
 	DEBUG(LOG_DEBUG, "Sending discover...");
 	return raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST, 
 				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
@@ -100,6 +112,7 @@ int send_selecting(unsigned long xid, unsigned long server, unsigned long reques
 	/* expects host order */
 	add_simple_option(packet.options, DHCP_SERVER_ID, ntohl(server));
 	
+	add_requests(&packet);
 	DEBUG(LOG_DEBUG, "Sending select...");
 	return raw_packet(&packet, INADDR_ANY, CLIENT_PORT, INADDR_BROADCAST, 
 				SERVER_PORT, MAC_BCAST_ADDR, client_config.ifindex);
@@ -142,4 +155,67 @@ int send_release(unsigned long server, unsigned long ciaddr)
 	return kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
 }
 
+
+int get_raw_packet(struct dhcpMessage *payload, int fd)
+{
+	int bytes;
+	struct udp_dhcp_packet packet;
+	u_int32_t source, dest;
+	u_int16_t check;
+
+	memset(&packet, 0, sizeof(struct udp_dhcp_packet));
+	bytes = read(fd, &packet, sizeof(struct udp_dhcp_packet));
+	if (bytes < 0) {
+		DEBUG(LOG_INFO, "couldn't read on listening socket -- ignoring");
+		return -1;
+	}
+	
+	if (bytes < (int) (sizeof(struct iphdr) + sizeof(struct udphdr))) {
+		DEBUG(LOG_INFO, "message too short, ignoring");
+		return -1;
+	}
+	
+	/* Make sure its the right packet for us, and that it passes sanity checks */
+	if (packet.ip.protocol != IPPROTO_UDP || packet.ip.version != IPVERSION ||
+	    packet.ip.ihl != sizeof(packet.ip) >> 2 || packet.udp.dest != htons(CLIENT_PORT) ||
+	    ntohs(packet.ip.tot_len) != bytes || bytes > (int) sizeof(struct udp_dhcp_packet) ||
+	    ntohs(packet.udp.len) != bytes - sizeof(packet.ip)) {
+	    	DEBUG(LOG_INFO, "unrelated/bogus packet");
+	    	return -1;
+	}
+
+	/* check IP checksum */
+	check = packet.ip.check;
+	packet.ip.check = 0;
+	if (check != checksum(&(packet.ip), sizeof(packet.ip))) {
+		DEBUG(LOG_INFO, "bad IP header checksum, ignoring");
+		return -1;
+	}
+	
+	/* verify the UDP checksum by replacing the header with a psuedo header */
+	source = packet.ip.saddr;
+	dest = packet.ip.daddr;
+	check = packet.udp.check;
+	packet.udp.check = 0;
+	memset(&packet.ip, 0, sizeof(packet.ip));
+
+	packet.ip.protocol = IPPROTO_UDP;
+	packet.ip.saddr = source;
+	packet.ip.daddr = dest;
+	packet.ip.tot_len = packet.udp.len; /* cheat on the psuedo-header */
+	if (check != checksum(&packet, bytes)) {
+		DEBUG(LOG_ERR, "packet with bad UDP checksum received, ignoring");
+		return -1;
+	}
+	
+	memcpy(payload, &(packet.data), bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
+	
+	if (ntohl(payload->cookie) != DHCP_MAGIC) {
+		LOG(LOG_ERR, "received bogus message (bad magic) -- ignoring");
+		return -1;
+	}
+	DEBUG(LOG_INFO, "oooooh!!! got some!");
+	return bytes - (sizeof(packet.ip) + sizeof(packet.udp));
+	
+}
 

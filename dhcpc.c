@@ -50,6 +50,11 @@ static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num = 0;
 
+#define LISTEN_NONE 0
+#define LISTEN_KERNEL 1
+#define LISTEN_RAW 2
+static int listen_mode = LISTEN_RAW;
+
 struct client_config_t client_config;
 
 static void print_usage(void)
@@ -70,10 +75,17 @@ static void renew_requested(int pid)
 {
 	pid = 0;
 	DEBUG(LOG_INFO, "Received SIGUSR1");
-	if (state == BOUND || state == RENEWING || state == REBINDING) {
+	if (state == BOUND || state == RENEWING || state == REBINDING ||
+	    state == RELEASED) {
+	    	listen_mode = LISTEN_KERNEL;
 		server_addr = 0;
 		packet_num = 0;
 		state = RENEW_REQUESTED;
+	}
+
+	if (state == RELEASED) {
+		listen_mode = LISTEN_RAW;
+		state = INIT_SELECTING;
 	}
 
 	/* Kill any timeouts because the user wants this to hurry along */
@@ -92,6 +104,7 @@ static void release_requested(int pid)
 		script_deconfig();
 	}
 
+	listen_mode = 0;
 	state = RELEASED;
 	timeout = 0xffffffff;
 }
@@ -141,7 +154,7 @@ int main(int argc, char *argv[])
 			if (client_config.dir) free(client_config.dir);
 			client_config.dir = malloc(strlen(optarg + 2));
 			strcpy(client_config.dir, optarg);
-			if (optarg[strlen(optarg)] != '/')
+			if (optarg[strlen(optarg) - 1] != '/')
 				strcat(client_config.dir, "/");
 			break;
 		case 'p': 
@@ -212,15 +225,22 @@ int main(int argc, char *argv[])
 
 	for (;;) {
 	
-		if ((fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface)) < 0) {
-			LOG(LOG_ERR, "couldn't create client socket -- au revoir");
-			exit(0);
-		}			
+		if (listen_mode == LISTEN_KERNEL) {
+			if ((fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface)) < 0) {
+				LOG(LOG_ERR, "couldn't create server socket -- au revoir");
+				exit(0);
+			}			
+		} else if (listen_mode == LISTEN_RAW) {
+			if ((fd = raw_socket(client_config.interface)) < 0) {
+				LOG(LOG_ERR, "couldn't create raw socket -- au revoir");
+				exit(0);
+			}			
+		} else fd = -1;
 
-		FD_ZERO(&rfds);
-		FD_SET(fd, &rfds);
 		tv.tv_sec = timeout - time(0);
 		tv.tv_usec = 0;
+		FD_ZERO(&rfds);
+		if (listen_mode) FD_SET(fd, &rfds);
 		
 		if (tv.tv_sec > 0) {
 			retval = select(fd + 1, &rfds, NULL, NULL, &tv);
@@ -260,11 +280,14 @@ int main(int argc, char *argv[])
 					state = INIT_SELECTING;
 					timeout = time(0);
 					packet_num = 0;
+					listen_mode = LISTEN_RAW;
+					
 				}
 				break;
 			case BOUND:
 				/* Lease is starting to run out, time to enter renewing state */
 				state = RENEWING;
+				listen_mode = LISTEN_KERNEL;
 				DEBUG(LOG_INFO, "Entering renew state");
 				/* fall right through */
 			case RENEWING:
@@ -291,6 +314,7 @@ int main(int argc, char *argv[])
 					script_deconfig();
 					timeout = time(0);
 					packet_num = 0;
+					listen_mode = LISTEN_RAW;
 				} else {
 					/* send a request packet */
 					send_renew(xid, 0, requested_ip); /* broadcast */
@@ -304,10 +328,14 @@ int main(int argc, char *argv[])
 				timeout = 0xffffffff;
 				break;
 			}
-		} else if (FD_ISSET(fd, &rfds)) {
+		} else if (listen_mode != LISTEN_NONE && FD_ISSET(fd, &rfds)) {
 			/* a packet is ready, read it */
 			
-			if (get_packet(&packet, fd) < 0) continue;
+			if (listen_mode == LISTEN_KERNEL) {
+				if (get_packet(&packet, fd) < 0) continue;
+			} else {
+				if (get_raw_packet(&packet, fd) < 0) continue;
+			} 
 			
 			if (packet.xid != xid) {
 				DEBUG(LOG_INFO, "Ignoring XID %lx (our xid is %lx)",
@@ -333,6 +361,8 @@ int main(int argc, char *argv[])
 						state = REQUESTING;
 						timeout = time(0);
 						packet_num = 0;
+					} else {
+						DEBUG(LOG_ERR, "No server ID in message");
 					}
 				}
 				break;
@@ -363,6 +393,7 @@ int main(int argc, char *argv[])
 					else script_bound(&packet);
 
 					state = BOUND;
+					listen_mode = LISTEN_NONE;
 					
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
@@ -372,6 +403,7 @@ int main(int argc, char *argv[])
 					timeout = time(0);
 					requested_ip = 0;
 					packet_num = 0;
+					listen_mode = LISTEN_RAW;
 				}
 				break;
 			case BOUND:
@@ -387,7 +419,7 @@ int main(int argc, char *argv[])
 			DEBUG(LOG_ERR, "Error on select");
 		}
 		
-		close(fd);
+		if (fd > 0) close(fd);
 	}
 	return 0;
 }

@@ -7,5 +7,6 @@ int send_selecting(unsigned long xid, unsigned long server, unsigned long reques
 int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr);
 int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr);
 int send_release(unsigned long server, unsigned long ciaddr);
+int get_raw_packet(struct dhcpMessage *payload, int fd);
 
 #endif
