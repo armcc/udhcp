@@ -37,7 +37,7 @@ static int read_str(char *line, void *arg)
 	
 	/* elimate trailing whitespace */
 	for (i = strlen(*dest) - 1; i > 0 && isspace((*dest)[i]); i--);
-	(*dest)[i] = '\0';
+	(*dest)[i > 0 ? i + 1 : 0] = '\0';
 	return 1;
 }
 
