@@ -140,7 +140,7 @@ int add_option_string(unsigned char *optionptr, unsigned char *string)
 			options[i].code ? options[i].name : "unknown", string[OPT_CODE]);
 		return 0;
 	}
-	DEBUG(LOG_INFO, "adding option %02x", string[OPT_CODE]);
+	DEBUG(LOG_INFO, "adding option 0x%02x", string[OPT_CODE]);
 	memcpy(optionptr + end, string, string[OPT_LEN] + 2);
 	optionptr[end + string[OPT_LEN] + 2] = DHCP_END;
 	return string[OPT_LEN] + 2;
@@ -165,6 +165,7 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 		return 0;
 	}
 	
+	DEBUG(LOG_INFO, "adding option 0x%02x", code);
 	end = end_option(optionptr);
 	optionptr[end + OPT_CODE] = code;
 	optionptr[end + OPT_LEN] = length;
