@@ -22,7 +22,7 @@ LD = $(CROSS_COMPILE)gcc
 INSTALL = install
 
 OBJS_SHARED = common.o options.o packet.o pidfile.o signalpipe.o socket.o
-DHCPD_OBJS = dhcpd.o arpping.o files.o leases.o serverpacket.o
+DHCPD_OBJS = dhcpd.o arpping.o files.o leases.o serverpacket.o static_leases.o
 DHCPC_OBJS = dhcpc.o clientpacket.o clientsocket.o script.o
 
 ifdef COMBINED_BINARY
