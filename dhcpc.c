@@ -276,6 +276,14 @@ int main(int argc, char *argv[])
 	if (read_interface(client_config.interface, &client_config.ifindex, 
 			   NULL, client_config.arp) < 0)
 		exit_client(1);
+		
+	if (!client_config.clientid) {
+		client_config.clientid = malloc(6 + 3);
+		client_config.clientid[OPT_CODE] = DHCP_CLIENT_ID;
+		client_config.clientid[OPT_LEN] = 7;
+		client_config.clientid[OPT_DATA] = 1;
+		memcpy(client_config.clientid + 3, client_config.arp, 6);
+	}
 
 	/* setup signal handlers */
 	signal(SIGUSR1, renew_requested);
