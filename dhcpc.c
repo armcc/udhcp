@@ -534,7 +534,7 @@ int main(int argc, char *argv[])
 			/* case BOUND, RELEASED: - ignore all packets */
 			}	
 		} else if (retval > 0 && FD_ISSET(signal_pipe[0], &rfds)) {
-			if (read(signal_pipe[0], &sig, sizeof(signal)) < 0) {
+			if (read(signal_pipe[0], &sig, sizeof(sig)) < 0) {
 				DEBUG(LOG_ERR, "Could not read signal: %s", 
 					strerror(errno));
 				continue; /* probably just EINTR */
