@@ -2,13 +2,13 @@
 
 # Uncomment this to get a shared binary. Call as udhcpd for the server,
 # and udhcpc for the client
-COMBINED_BINARY=1
+#COMBINED_BINARY=1
 
 # Uncomment this for extra output and to compile with debugging symbols
-DEBUG=1
+#DEBUG=1
 
 # Uncomment this to output messages to syslog, otherwise, messages go to stdout
-CFLAGS += -DSYSLOG
+#CFLAGS += -DSYSLOG
 
 #CROSS_COMPILE=arm-uclibc-
 CC = $(CROSS_COMPILE)gcc
