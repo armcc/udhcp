@@ -282,8 +282,8 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, terminate);
 	
 	state = INIT_SELECTING;
-	change_mode(LISTEN_RAW);
 	run_script(NULL, "deconfig");
+	change_mode(LISTEN_RAW);
 
 	for (;;) {
 
@@ -300,13 +300,14 @@ int main(int argc, char *argv[])
 				LOG(LOG_ERR, "FATAL: couldn't listen on socket, %s", sys_errlist[errno]);
 				exit_client(0);
 			}
-			FD_SET(fd, &rfds);		
 		}
+		if (fd >= 0) FD_SET(fd, &rfds);
 		
 		if (tv.tv_sec > 0) {
+			DEBUG(LOG_INFO, "Waiting on select...\n");
 			retval = select(fd + 1, &rfds, NULL, NULL, &tv);
 		} else retval = 0; /* If we already timed out, fall through */
-		
+
 		now = time(0);
 		if (retval == 0) {
 			/* timeout dropped to zero */
