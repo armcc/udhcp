@@ -110,7 +110,7 @@ u_int32_t find_address(int check_expired)
 	struct dhcpOfferedAddr *lease = NULL;		
 
 	addr = ntohl(server_config.start); /* addr is in host order here */
-	for (;addr < ntohl(server_config.end); addr++) {
+	for (;addr <= ntohl(server_config.end); addr++) {
 
 		/* ie, 192.168.55.0 */
 		if (!(addr & 0xFF)) continue;

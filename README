@@ -169,5 +169,11 @@ dhcpd.h contains the other two compile time options:
 	
 	DHCPD_CONFIG_FILE: The defualt config file to use.
 	
-	
+options.c contains a set of dhcp options for the client:
 
+	name[10]: The name of the option as it will appear in scripts
+	
+	flags: The type of option, as well as if it will be requested
+	by the client (OPTION_REQ)
+
+	code: The DHCP code for this option

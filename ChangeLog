@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ Would never assign end address (Keith Smith <keith@ksmith.com>)
 + Was improperly reporting yiaddr as siaddr (ben-udhcp@bdlow.net)
   udhcp bug#1256
 + Fixed reading of client id (David Poole <davep@portsmith.com>)
