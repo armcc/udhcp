@@ -1,5 +1,20 @@
+0.9.0 (010720) Major rewrite, current changes, goals:
++ should not segfault on bogus packets.
++ Options can be read from sname and file fields.
++ supports all DHCP messages (release, decline, inform).
++ IP block is now specified by a range of IP's.
++ Leases file now contains lease time (relative, or absolute).
++ Just about any DHCP option is now supported.
++ DNS entries are no longer read from resolv.conf
++ Lease file can be written periodically when the process receives a SIGUSR1
++ arpping should be supported on all arches.
++ support for DHCP relays.
++ DHCP messages can be unicast if the client requests it.
++ many, many, many other things.
+
 0.8.29 (000323)
 + stable(?) release
+
 
 0.8.28 (000323)
 + removed alarm as it was causing server to go down

@@ -1,79 +1,67 @@
-NETtel DHCP Server README
+Moreton Bay Server README
 -------------------------
 
-The NETtel DHCP Server is designed to run on a NETtel (which
-runs on Greg Ungerer's uClinux-coldfire kernel) but will easily
-run on normal Linux distributions for PCs.
+The Moreton Bay DHCP Server is designed deliberately to be a small,
+lean, DHCP server. It does however, strive to be a fully functional,
+and compliant server.
 
-The NETtel DHCP Server is designed deliberately to be a small,
-lean, DHCP server. It does not implement the entire protocol
-but only what is necessary to serve the following:
+The Moreton Bay DHCP Server employs a number of simple config files:
 
-	IP address (and its subnet)
-	Gateway address
-	DNS Server address
-	WINS (NetBIOS Name Server) 
-
-The lease times are hard coded to 10 days (from memory :-)
-
-
-The NETtel DHCP Server employs a number of simple config files:
-
-dhcpd.iplist
+udhcpd.leased
 ------------
-Binary list of ip addresses that the server may offer. This list may
-include ip addresses already leased out.
 
-
-dhcpd.leased
-------------
-Binary list of leased ip addresses and their respective MAC address.
-format:
+The udhcpd.leases behavior is designed for an embedded system. The
+file is written either every auto_time seconds, or when a SIGUSR1
+is received. When the file is written, a script can be optionally
+called to commit the file to flash. Lease times are stored in the
+file by time remaining in lease (for systems without clock that works
+when there is no power), or by the absolute time that it expires in
+seconds from epoch. In the remainig format, expired leases are stored
+as zero. The file is of the format:
 
 16 byte MAC
-8 byte ip address
+4 byte ip address
+u32 expire time
 16 byte MAC
-8 byte ip address
+4 byte ip address
+u32 expire time
 .
 etc.
 
-example: hexdump dhcpd.leases
+example: hexdump udhcpd.leases
 
-   0: 00 AB 00 00 00 00 00 00-00 FF 00 00 00 00 00 01 ................
-  10: CB 18 97 78 00 BB 00 00-00 00 00 00 00 AA 00 00 ...x............
-  20: 00 00 00 CC CB 18 97 79-00 80 5F 94 28 2A 00 00 .......y.._.(*..
-  30: 00 00 00 00 00 00 00 00-CB 18 97 7A             ...........z    
+0000000 1000 c95a 27d9 0000 0000 0000 0000 0000
+0000010 a8c0 150a 0d00 2d29 5000 23fc 8566 0000
+0000020 0000 0000 0000 0000 a8c0 140a 0d00 4e29
+0000030
 
-dhcpd.conf
+
+udhcpd.conf
 ----------
 
-/etc/config> cat dhcpd.conf
-subnet 255.255.255.0
-router 203.24.151.121
-wins 203.50.0.24
-/etc/config> 
+The format is fairly simple, there is a sample file with all the
+available options and comments describing them in samples/udhcpd.conf
 
 
----
-DNS is grabbed from resolv.conf:
-nameserver x.x.x.x
-nameserver y.y.y.y
-nameserver z.z.z.z
+compile time options
+-------------------
 
-Up to 3 DNS servers are supported.
-
----
-Q&A
-
-
-Q. Isn't this all very complicated for a lease/ip pool?
-A. yes.. but it saves space :-)
-
-
-
-
-
-
+The Makefile contains two of the compile time options:
+	
+	DEBUG: If DEBUG is defined, udhcpd will output extra debugging
+	output, compile with -g, and not fork to the background when run.
+	
+	SYSLOG: If SYSLOG is defined, udhcpd will log all its messages
+	syslog, otherwise, it will attempt to log them to stdout.
+	
+dhcpd.h contains the other two compile time options:
+	
+	LEASE_TIME: The default lease time if not specified in the config
+	file.
+	
+	DHCPD_CONFIG_FILE: What config file to use.
+	
+	
 
 Have fun!
 -Moreton Bay DHCP Server development team.

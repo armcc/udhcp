@@ -4,6 +4,8 @@
  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
  *			Chris Trew <ctrew@moreton.com.au>
  *
+ * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -31,12 +33,13 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#ifdef SYSLOG
 #include <syslog.h>
+#endif
 #include <signal.h>
 #include <errno.h>
-#ifndef EMBED
 #include <sys/ioctl.h>
-#endif
+#include <time.h>
 
 #include "debug.h"
 #include "dhcpd.h"
@@ -44,763 +47,447 @@
 #include "socket.h"
 #include "options.h"
 #include "files.h"
-#include "nettel.h"
-
+#include "leases.h"
 
 /* prototypes */
-int log_pid();
+int log_pid(void);
 int getPacket(struct dhcpMessage *packet, int server_socket);
-int sendOffer(int client_socket, struct dhcpMessage *oldpacket);
-int sendNAK(int client_socket, struct dhcpMessage *oldpacket);
-int sendACK(int client_socket, struct dhcpMessage *oldpacket);
-u_int32_t findAddr(u_int8_t *chaddr, u_int32_t xid);
-int test_ip(u_int32_t ipaddr);
-u_int32_t freeIPAddresses(u_int32_t leased[],int num_leased);
+int sendOffer(struct dhcpMessage *oldpacket);
+int sendNAK(struct dhcpMessage *oldpacket);
+int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr);
+int send_inform(struct dhcpMessage *oldpacket);
+u_int32_t find_address(int check_expired);
+int check_ip(u_int32_t ipaddr);
 
 
 /* globals */
-struct dhcpOfferedAddr offeredAddr[MAX_SIMUL_CLIENTS];
-int offer_num = 0; /* how many offers we are currently serving */
-unsigned char server_ipaddr[4];
+struct dhcpOfferedAddr *leases;
+struct server_config config;
 
-
-int main() {
-	int server_socket;
-	int client_socket;
-	int bytes;
-	struct dhcpMessage packet;
-	unsigned char *state, *hw_addr;
-	unsigned char *server_id;
-	int search_result;
+void udhcpd_killed(int pid)
+{
+	pid = 0;
+	if (config.pid_file) unlink(config.pid_file);
+	LOG(LOG_INFO, "Received SIGTERM");
+#ifdef SYSLOG
+	closelog();
+#endif
+	exit(0);
+}	
 	
+int main(void) {
+	fd_set rfds;
+	struct timeval tv;
+	int server_socket;
+	int bytes, retval;
+	struct dhcpMessage packet;
+	unsigned char *state;
+	u_int32_t *server_id, *requested;
+	unsigned long timeout_end;
+	struct option_set *option;
+	struct dhcpOfferedAddr *lease;
+	struct sockaddr_in *sin;
+			
 	/* server ip addr */
 	int fd = -1;
 	struct ifreq ifr;
-	struct sockaddr_in *sin;
 
-	/* by default 10.10.10.10 -- server id */
-	server_ipaddr[0] = 0xA;
-	server_ipaddr[1] = 0xA;
-	server_ipaddr[2] = 0xA;
-	server_ipaddr[3] = 0xA;
+#ifdef SYSLOG
+	openlog("udhcpd", 0, 0);
+#endif
+	LOG(LOG_INFO, "Moreton Bay DHCP Server (v%s) started", VERSION);
+	
+	memset(&config, 0, sizeof(struct server_config));
+	
+	read_config(DHCPD_CONF_FILE);
+	if ((option = find_option(config.options, DHCP_LEASE_TIME)))
+		config.lease = ntohl((u_int32_t) option->data[2]);
+	else config.lease = LEASE_TIME;
+	
+	leases = malloc(sizeof(struct dhcpOfferedAddr) * config.max_leases);
+	memset(leases, 0, sizeof(struct dhcpOfferedAddr) * config.max_leases);
+	read_leases(config.lease_file);
 
-	openlog("dhcpd", 0, 0);
-	syslog(LOG_INFO, "Moreton Bay DHCP Server (v%s) started", VERSION);
 	log_pid();
 	
+	/* by default 10.10.10.10 -- server id */
+	config.server = htonl(0x0A0A0A0A);
+	
 	if((fd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) >= 0) {
-		strcpy(ifr.ifr_name, "eth0");
 		ifr.ifr_addr.sa_family = AF_INET;
+		strcpy(ifr.ifr_name, config.interface);
 		if (ioctl(fd, SIOCGIFADDR, &ifr) == 0) {
-			sin = (struct sockaddr_in *)&ifr.ifr_addr;
-#if EMBED
-			sin->sin_addr.s_addr = htonl(sin->sin_addr.s_addr);
-#endif
-#if DEBUG
-			syslog(LOG_INFO, "eth0 (server_ip) = %s", inet_ntoa(sin->sin_addr));
-#endif
-			memcpy(server_ipaddr, &sin->sin_addr, 4);
+			sin = (struct sockaddr_in *) &ifr.ifr_addr;
+			config.server = sin->sin_addr.s_addr;
+			DEBUG(LOG_INFO, "%s (server_ip) = %s", ifr.ifr_name, inet_ntoa(sin->sin_addr));
+		} else {
+			LOG(LOG_ERR, "SIOCGIFADDR failed!");
+			return 1;
 		}
+		if (ioctl(fd, SIOCGIFINDEX, &ifr) == 0) {
+			DEBUG(LOG_INFO, "adapter index %d", ifr.ifr_ifindex);
+			config.ifindex = ifr.ifr_ifindex;
+		} else {
+			LOG(LOG_ERR, "SIOCGIFINDEX failed!");
+			return 1;
+		}
+		if (ioctl(fd, SIOCGIFHWADDR, &ifr) == 0) {
+			memcpy(config.arp, ifr.ifr_hwaddr.sa_data, 6);
+			DEBUG(LOG_INFO, "adapter hardware address %02x:%02x:%02x:%02x:%02x:%02x",
+				config.arp[0], config.arp[1], config.arp[2], 
+				config.arp[3], config.arp[4], config.arp[5]);
+		} else {
+			LOG(LOG_ERR, "SIOCGIFHWADDR failed!");
+			return 1;
+		}
+	} else {
+		LOG(LOG_ERR, "socket failed!");
+		return 1;
 	}
 
+#ifndef DEBUGGING
+	if (fork()) return 0;
+	else {
+		close(0);
+		setsid();
+	}
+#endif
+
+
+	signal(SIGUSR1, write_leases);
+	signal(SIGTERM, udhcpd_killed);
+
+	timeout_end = time(0) + config.auto_time;
 	while(1) { /* loop until universe collapses */
-		server_socket = serverSocket(LISTEN_PORT);
+
+		server_socket = serverSocket(SERVER_PORT);
 		if(server_socket == -1) {
-			syslog(LOG_ERR, "couldn't create server socket -- au revoir");
+			LOG(LOG_ERR, "couldn't create server socket -- au revoir");
 			exit(0);
 		}			
 
+		FD_ZERO(&rfds);
+		FD_SET(server_socket, &rfds);
+		if (config.auto_time) {
+			tv.tv_sec = timeout_end - time(0);
+			if (tv.tv_sec <= 0) {
+				tv.tv_sec = config.auto_time;
+				timeout_end = time(0) + config.auto_time;
+				write_leases(0);
+			}
+			tv.tv_usec = 0;
+		}
+		retval = select(server_socket + 1, &rfds, NULL, NULL, config.auto_time ? &tv : NULL);
+		if (retval == 0) {
+			write_leases(0);
+			timeout_end = time(0) + config.auto_time;
+			continue;
+		} else if (retval < 0) {
+			DEBUG(LOG_INFO, "error on select");
+			continue;
+		}
+		
 		bytes = getPacket(&packet, server_socket); /* this waits for a packet - idle */
 		close(server_socket);
 		if(bytes < 0)
 			continue;
 
-#ifdef CONFIG_NETtel
-/*******************************************************************************************/
-		/* Now check to see if the request came from this NETtel.
-		 * if so we wish to ignore its cries for an address */
-		if((state = getOption(packet.options, DHCP_CLIENT_ID)) == NULL) {
-#if DEBUG
-			syslog(LOG_ERR, "couldnt get option from packet (CLIENT_ID) -- ignoring");
-			syslog(LOG_ERR, "maybe RedHat pump is the client.. -- ignore missing CLIENT_ID");
-#endif
-		} else {
-		
-			state++; /* move pointer up as state[0] == ARPHRD_ETHER == 0x01 */
-			hw_addr = (unsigned char *) (0xf0006000);
-	
-			/* state should now be pointing to the  hardware address as will
-			 * hw_addr which points to a memory location inside the nettel */
-#if DEBUG
-			syslog(LOG_INFO, "state = %02x%02x%02x%02x%02x%02x",state[0],state[1],state[2],state[3],state[4],state[5]);
-			syslog(LOG_INFO, "hw1 = %02x%02x%02x%02x%02x%02x",hw_addr[0],hw_addr[1],hw_addr[2],hw_addr[3],hw_addr[4],hw_addr[5]);
-			syslog(LOG_INFO, "hw2 = %02x%02x%02x%02x%02x%02x",hw_addr[6],hw_addr[7],hw_addr[8],hw_addr[9],hw_addr[10],hw_addr[11]);
-#endif		
-			if(memcmp(hw_addr,state,6) == 0) {
-#if DEBUG
-				syslog(LOG_INFO, "not responding to my other half self");
-#endif
-				continue; /* skip everything and listen to another request */
-			} else if(memcmp(hw_addr+6,state, 6) == 0) {
-#if DEBUG
-				syslog(LOG_INFO, "not responding to my other half self");
-#endif
-				continue; /* skip everything and listen to another request */
-			}
-		}
-/*******************************************************************************************/
-#endif
-	
-		if((state = getOption(packet.options, DHCP_MESSAGE_TYPE)) == NULL) {
-#if DEBUG
-			syslog(LOG_ERR, "couldnt get option from packet (MSG_TYPE) -- ignoring");
-#endif
+		if((state = get_option(&packet, DHCP_MESSAGE_TYPE)) == NULL) {
+			DEBUG(LOG_ERR, "couldnt get option from packet -- ignoring");
 			continue;
 		}
 		
-#ifdef CONFIG_NETtel
-		/* 1. why don't we add a 'route add -host allones eth0' here as
-		 *		an experiment.
-		 * 2. we should lock the DHCP client from working until route_del_host()
-		 */
-		route_add_host(ADD);
-#endif
-		
-		if((client_socket = clientSocket(LISTEN_PORT, SEND_PORT)) == -1) {
-			syslog(LOG_ERR, "couldn't create client socket -- i'll try again");
-			continue;
-		}
-			
-		switch(state[0]) {
+		lease = find_lease_by_chaddr(packet.chaddr);
+		switch (state[0]) {
 		case DHCPDISCOVER:
-#if DEBUG
-			syslog(LOG_INFO,"received DISCOVER");
-#endif
-			if(sendOffer(client_socket, &packet) == -1) {
-				syslog(LOG_ERR, "send OFFER failed -- ignoring");
-				close(client_socket);
-				continue; /* error occoured */
-			}
-			break;
+			DEBUG(LOG_INFO,"received DISCOVER");
 			
-		case DHCPREQUEST:
-#if DEBUG
-			syslog(LOG_INFO,"received REQUEST");
-#endif
-			server_id = getOption(packet.options, 0x36);
-			if(server_id == NULL) {
-#if DEBUG
-				syslog(LOG_INFO, "get option on 0x36 failed! NAKing");
-#endif
-				sendNAK(client_socket, &packet);
-				/* Let's send an offer as well */
-				if(sendOffer(client_socket, &packet) == -1) {
-					syslog(LOG_ERR, "send OFFER failed -- ignoring");
-					close(client_socket);
-					continue; /* error occoured */
-				}
-			} else {
-#if DEBUG
-				syslog(LOG_INFO, "server_id = %02x%02x%02x%02x", server_id[0], server_id[1],
-						server_id[2], server_id[3]);
-#endif
-				if(memcmp(server_id, server_ipaddr, 4) == 0) {
-					if (sendACK(client_socket, &packet) == -1)
-						sendNAK(client_socket, &packet);
+			if (sendOffer(&packet) < 0) {
+				LOG(LOG_ERR, "send OFFER failed -- ignoring");
+			}
+			break;			
+ 		case DHCPREQUEST:
+			DEBUG(LOG_INFO,"received REQUEST");
+
+			requested = (u_int32_t *) get_option(&packet, DHCP_REQUESTED_IP);
+			server_id = (u_int32_t *) get_option(&packet, DHCP_SERVER_ID);
+
+			if (lease) {
+				if (server_id) {
+					/* SELECTING State */
+					DEBUG(LOG_INFO, "server_id = %08x", ntohl(*server_id));
+					if (*server_id == config.server && requested && 
+					    *requested == lease->yiaddr) {
+						sendACK(&packet, lease->yiaddr);
+					}
 				} else {
-					sendNAK(client_socket, &packet);
+					if (requested) {
+						/* INIT-REBOOT State */
+						if (lease->yiaddr == *requested)
+							sendACK(&packet, lease->yiaddr);
+						else sendNAK(&packet);
+					} else {
+						/* RENEWING or REBINDING State */
+						if (lease->yiaddr == packet.ciaddr)
+							sendACK(&packet, lease->yiaddr);
+						else {
+							/* don't know what to do!!!! */
+							sendNAK(&packet);
+						}
+					}						
 				}
-			}
+			} /* else remain silent */				
 			break;
-			
+		case DHCPDECLINE:
+			DEBUG(LOG_INFO,"received DECLINE");
+			if (lease) {
+				memset(lease->chaddr, 0, 16);
+				lease->expires = time(0) + config.decline_time;
+			}			
+			break;
+		case DHCPRELEASE:
+			DEBUG(LOG_INFO,"received RELEASE");
+			if (lease) lease->expires = time(0);
+			break;
+		case DHCPINFORM:
+			DEBUG(LOG_INFO,"received INFORM");
+			send_inform(&packet);
+			break;	
 		default:
-			syslog(LOG_WARNING, "unsupported DHCP message (%02x) -- ignoring", state[0]);
+			LOG(LOG_WARNING, "unsupported DHCP message (%02x) -- ignoring", state[0]);
 		}
-		
-		close(client_socket);
-#ifdef CONFIG_NETtel
-		route_add_host(DEL); /* what the hell is this */
-#endif
 	}
 
-	/* should never executes */
-	syslog(LOG_ERR, "exit");
-	closelog();
 	return 0;
 }
 
 
-int log_pid() {
+int log_pid(void) 
+{
 	int fd;
 	pid_t pid;
-	char *pidfile = PID_FILE;
+	char *pidfile = config.pid_file;
 
 	pid = getpid();
 	if((fd = open(pidfile, O_WRONLY | O_CREAT, 0660)) < 0)
 		return -1;
 	write(fd, (void *) &pid, sizeof(pid));
 	close(fd);
+	return 0;
 }
 
 
 int getPacket(struct dhcpMessage *packet, int server_socket) {
-	char buf[sizeof(struct dhcpMessage)];
-	u_int32_t magic;
 	int bytes;
 
-#if DEBUG
-	syslog(LOG_INFO, "listening for any DHCP messages on network...");
-#endif
-	memset(buf, 0, sizeof(buf));
-	bytes = read(server_socket, (char *)buf, sizeof(buf));
-	if(bytes < 0) {
-#if DEBUG
-		syslog(LOG_INFO, "couldn't read on server socket -- ignoring");
-#endif
+	DEBUG(LOG_INFO, "listening for any DHCP messages on network...");
+
+	memset(packet, 0, sizeof(struct dhcpMessage));
+	bytes = read(server_socket, packet, sizeof(struct dhcpMessage));
+	if (bytes < 0) {
+		DEBUG(LOG_INFO, "couldn't read on server socket -- ignoring");
 		return -1;
 	}
 
-	memcpy(packet, buf, sizeof(buf));
-	memcpy(&magic, &packet->cookie, 4);
-	if(htonl(magic) != MAGIC) {
-		syslog(LOG_ERR, "client sent bogus message -- ignoring");
+	if (ntohl(packet->cookie) != DHCP_MAGIC) {
+		LOG(LOG_ERR, "client sent bogus message -- ignoring");
 		return -1;
 	}
-#if DEBUG
-	syslog(LOG_INFO, "oooooh!!! got some!");
-#endif
+	DEBUG(LOG_INFO, "oooooh!!! got some!");
 	return bytes;
 }
 
+void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacket, char type)
+{
+	memset(packet, 0, sizeof(struct dhcpMessage));
+	
+	packet->op = BOOTREPLY;
+	packet->htype = ETH_10MB;
+	packet->hlen = ETH_10MB_LEN;
+	packet->xid = oldpacket->xid;
+	memcpy(packet->chaddr, oldpacket->chaddr, 16);
+	packet->cookie = htonl(DHCP_MAGIC);
+	packet->options[0] = DHCP_END;
+	packet->flags = oldpacket->flags;
+	packet->giaddr = oldpacket->giaddr;
+	packet->ciaddr = oldpacket->ciaddr;
+	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
+	add_simple_option(packet->options, DHCP_SERVER_ID, ntohl(config.server)); /* expects host order */
+}
 
 /* send a DHCP OFFER to a DHCP DISCOVER */
-int sendOffer(int client_socket, struct dhcpMessage *oldpacket) {
-	FILE *in;
+int sendOffer(struct dhcpMessage *oldpacket) {
+
 	struct dhcpMessage packet;
-	char buf[sizeof(struct dhcpMessage)];
-	int bytes;
-	int n,k;
-	int address_used = FALSE;
-	int found_one = FALSE;
-	char tmp[32];
-	struct in_addr inp;
+	struct dhcpOfferedAddr *lease = NULL;
+	u_int32_t *req, lease_time = config.lease;
+	struct option_set *curr;
+	struct in_addr addr;
 
-	memset(&packet, 0, sizeof(packet));
-	
-	packet.op = BOOTREPLY;
-	packet.htype = ETH_10MB;
-	packet.hlen = ETH_10MB_LEN;
-	packet.xid = oldpacket->xid;
-	if((packet.yiaddr = findAddr(oldpacket->chaddr, oldpacket->xid)) == 0) {
-		syslog(LOG_WARNING, "no IP addresses to give -- OFFER abandoned");
-		return -1;
-	}
-	
-	memcpy(&packet.chaddr, oldpacket->chaddr, 16);
-	memcpy(&packet.cookie, "\x63\x82\x53\x63", 4);
-	memcpy(&packet.options, "\xff", 1);
-	
-	addOption(packet.options, 0x35, 0x01, "\x02");
-	addOption(packet.options, 0x36, 0x04, server_ipaddr);
+	init_packet(&packet, oldpacket, DHCPOFFER);
 
-	/* lease time */
-	addOption(packet.options, 0x33, 0x04, LEASE_TIME);
-	
-	/* subnet */
-	if((search_config_file(DHCPD_CONF_FILE, "subnet", tmp)) == 1) {
-		inet_aton(tmp, &inp);
-		addOption(packet.options, 0x01, 0x04, (char *)&inp.s_addr);
-	}
+	/* the client is in our lease/offered table */
+	if ((lease = find_lease_by_chaddr(oldpacket->chaddr))) {
+		if (!lease_expired(lease)) 
+			lease_time = lease->expires - time(0);
+		packet.yiaddr = lease->yiaddr;
+		
+	/* Or the client has a requested ip */
+	} else if ((req = (u_int32_t *) get_option(oldpacket, DHCP_REQUESTED_IP)) &&
 
-	/* gateway */
-	if((search_config_file(DHCPD_CONF_FILE, "router", tmp)) == 1) {
-		inet_aton(tmp, &inp);
-		addOption(packet.options, 0x03, 0x04, (char *)&inp.s_addr);
-	}
-			
-	memcpy(buf, &packet, sizeof(packet));
+		   /* and the ip is in the lease range */
+		   ntohl(*req) >= ntohl(config.start) &&
+		   ntohl(*req) <= ntohl(config.end) &&
+		   
+		   /* and its not already taken/offered */
+		   ((!(lease = find_lease_by_yiaddr(*req)) ||
+		   
+		   /* or its taken, but expired */
+		   lease_expired(lease)))) {
+		   
+				packet.yiaddr = *req;
 
-#if DEBUG
-	syslog(LOG_INFO, "sending OFFER");
-#endif
-	bytes = send(client_socket, buf, sizeof(buf), 0);
-	if(bytes == -1) {
-#if DEBUG
-		syslog(LOG_ERR, "couldn't write to client_socket -- OFFER abandoned");
-#endif
-		return -1;
-	}
-	return 0;
-}
-
-
-int sendNAK(int client_socket, struct dhcpMessage *oldpacket) {
-	struct dhcpMessage packet;
-	char buf[sizeof(struct dhcpMessage)];
-	int bytes;
-
-	memset(&packet, 0, sizeof(packet));
-	
-	packet.op = BOOTREPLY;
-	packet.htype = ETH_10MB;
-	packet.hlen = ETH_10MB_LEN;
-	packet.xid = oldpacket->xid;
-	memcpy(&packet.chaddr, oldpacket->chaddr, 16);
-	memcpy(&packet.cookie, "\x63\x82\x53\x63", 4);
-	memcpy(&packet.options, "\xff", 1);
-	/* options should look like this:
-	* 0x350106 -- NAK 
-	* 0x3604serverid - server id */
-	addOption(packet.options, 0x35, 0x01, "\x06");
-	addOption(packet.options, 0x36, 0x04, server_ipaddr);
-	
-	memcpy(buf, &packet, sizeof(packet));
-#if DEBUG
-	syslog(LOG_INFO, "sending NAK");
-#endif
-	bytes = send(client_socket, buf, sizeof(buf), 0);
-	
-	if(bytes == -1) {
-#if DEBUG
-		syslog(LOG_ERR, "error writing to client -- NAK abandoned");
-#endif
-		return -1;
-	}
-	return 0;
-}
-
-
-int sendACK(int client_socket, struct dhcpMessage *oldpacket) {
-	struct dhcpMessage packet;
-	char buf[sizeof(struct dhcpMessage)];
-	int bytes;
-	int k;
-	char tmp[96];
-	char tmp1[32];
-	char tmp2[32];
-	char tmp3[32];
-	struct in_addr inp;
-	struct in_addr inp1;
-	struct in_addr inp2;
-	struct in_addr inp3;
-	int result = FALSE;
-	int num;
-
-	memset(&packet, 0, sizeof(packet));
-	
-	packet.op = BOOTREPLY;
-	packet.htype = ETH_10MB;
-	packet.hlen = ETH_10MB_LEN;
-	packet.xid = oldpacket->xid;
-	packet.ciaddr = oldpacket->ciaddr;
-	memcpy(&packet.chaddr, oldpacket->chaddr, 16);
-	memcpy(&packet.chaddr, oldpacket->chaddr, 16);
-	memcpy(&packet.cookie, "\x63\x82\x53\x63", 4);
-	memcpy(&packet.options, "\xff", 1);
-
-	/* loop thru offeredAddr to find which addr we
-	 * offered this client */
-#if DEBUG
-	syslog(LOG_INFO, "cycling thru offered array of size %d", offer_num);
-#endif
-	for(k=0;k<offer_num;k++) { /* cycle through the offered array */
-		if(memcmp(offeredAddr[k].chaddr,packet.chaddr, 16) == 0) {
-#if DEBUG
-			syslog(LOG_INFO, "chaddr matches what I have in my internel offer array");
-#endif
-			packet.yiaddr = offeredAddr[k].yiaddr;
-			inp.s_addr = packet.yiaddr;
-#if DEBUG
-			syslog(LOG_INFO,"i'll attempt to ACK with ip_addr %s", inet_ntoa(inp));
-#else
-			syslog(LOG_INFO,"serving %s", inet_ntoa(inp));
-#endif
-			offeredAddr[k].yiaddr = offeredAddr[offer_num-1].yiaddr;			
-			memcpy(offeredAddr[k].chaddr, offeredAddr[offer_num-1].chaddr, 16);
-			offer_num--;
-			result = TRUE;
-			break;
-		}
-	}
-	
-	if (result != TRUE) { /* if we cant find it in the offered array somthing has gone wrong */ 
-		syslog(LOG_ERR, "couldn't find in offer array -- ACK abandoned");
-		return -1;
-	}
-	
-	/* options should look like this:
-	* 0x350106 -- NAK 
-	* 0x3604 serverid - server id */
-	addOption(packet.options, 0x35, 0x01, "\x05");
-	addOption(packet.options, 0x36, 0x04, server_ipaddr);
-	addOption(packet.options, 0x33, 0x04, LEASE_TIME);
-
-	/* subnet */
-	if((search_config_file(DHCPD_CONF_FILE, "subnet", tmp)) == 1) {
-		inet_aton(tmp, &inp);
-		addOption(packet.options, 0x01, 0x04, (char *)&inp.s_addr);
-	}
-	
-	/* gateway */
-	if((search_config_file(DHCPD_CONF_FILE, "router", tmp)) == 1) {
-		inet_aton(tmp, &inp);
-		addOption(packet.options, 0x03, 0x04, (char *)&inp.s_addr);
-	}
-
-	/* DNS */
-#ifdef CONFIG_NETtel
-	if((num = get_multiple_entries("/etc/config/resolv.conf", "nameserver", tmp1, tmp2, tmp3)) > 0) {
-#else
-	if((num = get_multiple_entries("/etc/resolv.conf", "nameserver", tmp1,tmp2,tmp3)) > 0) {
-#endif
-		if(num>0) {
-			inet_aton(tmp1, &inp1);
-			if(num>1) {
-				inet_aton(tmp2, &inp2);
-				if(num>2) {
-					inet_aton(tmp3, &inp3);
-				}
-			}
-		}
-		if(num == 1) {
-			add_multiple_option(packet.options, 0x06, 0x04, (char *)&inp1.s_addr, NULL, NULL);
-		} else if(num == 2) {
-			add_multiple_option(packet.options, 0x06, 0x08, (char *)&inp1.s_addr, (char *)&inp2.s_addr, NULL);
-		} else if (num == 3) {
-			add_multiple_option(packet.options, 0x06, 0x0c, (char *)&inp1.s_addr, (char *)&inp2.s_addr, (char *)&inp3.s_addr);
-		}
-	}
-	
-	/* WINS */
-	if((search_config_file(DHCPD_CONF_FILE, "wins", tmp)) == 1) {
-		inet_aton(tmp, &inp);
-		addOption(packet.options, 0x2C, 0x04, (char *)&inp.s_addr);
-	}
-	
-	memcpy(buf, &packet, sizeof(packet));
-#if DEBUG
-	syslog(LOG_INFO, "sending ACK");
-#endif
-	bytes = send(client_socket, buf, sizeof(buf), 0);
-	
-	if(bytes == -1) {
-#if DEBUG
-		syslog(LOG_ERR, "error writing to client_socket -- ACK abandoned");
-#endif
-		return -1;
-	}
-
-	/* write new ip to lease section of config file
-	 * check that we dont write a lease that is already in the
-	 * lease file (ie. reusing address since MAC is the same 
-	 * if it came from the lease file already dont re add it */
-	if(check_if_already_leased(packet.yiaddr) == 0) {
-		addLeased(packet.yiaddr, packet.chaddr);
-	}
-
-#ifdef CONFIG_NETtel
-	if(commitChanges() == -1)
-		return -1;
-#endif
-	return 0;
-}
-
-
-u_int32_t findAddr(u_int8_t *chaddr, u_int32_t xid) {
-	u_int32_t yiaddr = 0;
-	u_int32_t iplist[MAX_IP_ADDR];
-	u_int32_t leased[MAX_IP_ADDR];
-	FILE *in = NULL;
-	int n = 0;
-	int k,i;
-	size_t items; /* return value for fread */
-	int num_ip_addr;
-	int num_leased;
-	u_int8_t mac_addr[16];
-	u_int32_t ip_addr;
-	int ip_leased = FALSE; /* is the addressed leased? */
-	int already_in_offered = FALSE;
-
-	/* see if this chaddr is in the offered pool first */
-	/* don't add this addr to offeredAddr if chaddr already in there! */
-	/* win95 has a bad habbit of changing xid's halfway thru a conversation */
-	for(n=0;n<offer_num;n++) {
-		if(memcmp(offeredAddr[n].chaddr,chaddr,16) == 0) {
-#if DEBUG			
-			syslog(LOG_INFO, "chaddr already in offer array");
-#endif			
-			already_in_offered = TRUE;
-			break;
-		}
-	}
-
-	if (already_in_offered == TRUE) {
-#if DEBUG
-		syslog(LOG_INFO, "i've already offered you an address -- have it again (%x)", offeredAddr[n].yiaddr);
-#endif
-		return offeredAddr[n].yiaddr;
+	/* otherwise, find a free IP */
 	} else {
-#if DEBUG
-		syslog(LOG_INFO, "searching for new address for new client");
-#endif
-	}
+		packet.yiaddr = find_address(0);
 		
-	/* open up dhcpd.iplist */
-	if((in = fopen(DHCPD_IPLIST_FILE, "r")) == NULL) {
-		syslog(LOG_ERR, "%s not found -- no IP pool to draw from", DHCPD_IPLIST_FILE);
+		/* try for an expired lease */
+		if (!packet.yiaddr) packet.yiaddr = find_address(1);
+	}
+	
+	if(!packet.yiaddr) {
+		LOG(LOG_WARNING, "no IP addresses to give -- OFFER abandoned");
 		return -1;
 	}
 	
-	/* Read in all the values into the iplist Array*/
-	while(TRUE) {
-		items = fread(&iplist[n++], sizeof(u_int32_t), 1, in);
-		if(items < 1)
-			break;
-	}
-	fclose(in);
+	if (!add_lease(packet.chaddr, packet.yiaddr, config.offer_time)) {
+		LOG(LOG_WARNING, "lease pool is full -- OFFER abandoned");
+		return -1;
+	}		
 
-	num_ip_addr = n-1;
+	if (get_option(oldpacket, DHCP_LEASE_TIME)) {
+		lease_time = ntohl(*((u_int32_t *)get_option(oldpacket, DHCP_LEASE_TIME)));
+		if (lease_time > config.lease) lease_time = config.lease;
+	}
 		
-	if((in = fopen(DHCPD_LEASES_FILE, "r")) == NULL) {
-#if DEBUG
-		syslog(LOG_WARNING, "dhcpd.leases not found -- no leases");
-#endif
-	}
-	
-	n=0;
-	/* Read in the mac - IP pair from the leases file */
-	while(TRUE) {
-		if(in == NULL)
-			break;
-		items = fread(&mac_addr, sizeof(mac_addr), 1, in);
-		if(items < 1)
-			break;
-		items = fread(&ip_addr, sizeof(ip_addr), 1, in);
-		if(items < 1)
-			break;
-#if DEBUG
-			syslog(LOG_INFO,"file yielded valid MAC/IP pair - ip_addr = %x", ip_addr);
-			print_chaddr(mac_addr,"MAC");
-			print_chaddr(mac_addr,"CDR");
-#endif
-		if(memcmp(mac_addr, chaddr, sizeof(mac_addr)) == 0) {
-#if DEBUG
-			syslog(LOG_INFO, "hey! i've seen you around before...");
-#endif
-			/* ooh! the connecting clients MAC address
-			* is already in lease file!! let's offer him
-			* the address he used last time */
-#if DEBUG			
-			syslog(LOG_INFO, "i found an address you've used before.. have it again");
-#endif			
-			memcpy(offeredAddr[offer_num].chaddr,chaddr,16);
-			offeredAddr[offer_num].yiaddr = ip_addr;
-			if(offer_num < MAX_SIMUL_CLIENTS)
-				offer_num++;
-			else {
-				syslog(LOG_ERR, "Ahhh!! i'm not configured to handle that many simultaneous clients!!");
-				syslog(LOG_ERR, "I'm resetteing my offer count and trying again");
-				offer_num=0;
-			}
-			return ip_addr;
-		} else { 
-			/* Add it to the array for later comparison between available leases 
-			 * and the ones that are already leased */
-#if DEBUG
-			syslog(LOG_INFO, "added lease to array");
-#endif
-			leased[n++] = ip_addr;
-		}
-	}
-	if(in != NULL)
-		fclose(in);
-	
-	num_leased = n;
-		
-	/* compare the leased addresses with the actual list and
-	 * find the first free address */ 
-	/* also check the offeredAddr array so we don't offer the same
-	 * addr to simultaneously connecting clients */
-	for(n=0;n<num_ip_addr;n++) {
-		for(k=0;k<num_leased;k++) {
-			if(iplist[n] == leased[k]) {
-				/* address already leased */
-#if DEBUG				
-				syslog(LOG_INFO, "address %x is already leased... skipping", iplist[n]);
-#endif				
-				ip_leased = TRUE;
-				break;
-			}
-		}
-		if(ip_leased == FALSE) { /* if the ip wasnt leased */
-			/* check that it is not in offered list */
-			for(i=0;i<offer_num;i++) { /* cycle thru offered array */
-				if(iplist[n] == offeredAddr[i].yiaddr) { /* already there.. hand it out again */
-					if (memcmp(offeredAddr[i].chaddr,chaddr,16) == 0) {
-#if DEBUG				
-						syslog(LOG_INFO, "already in offered array.. have it again!");
-#endif				
-						break;
-					}
-#if DEBUG				
-					syslog(LOG_INFO, "address already offered but not yet cleared..");
-#endif				
-					ip_leased = TRUE;
-					break;
-				}
-			}
-			
-			if(ip_leased == FALSE) {
-				/* Now we test to see if the address is actually currently taken 
-				 * if it is we should also set it to leased in the leased file */
-#if EMBED
-				if (test_ip(iplist[n]) == 0) {
-					/* it passed the test you are free to have it */
-#if DEBUG				
-					syslog(LOG_INFO, "address arped and is free");
-#endif				
-					yiaddr = iplist[n]; /* after setting the yiaddr for testing later */
-					break;/* breaks outer loop */
-				}
-#if DEBUG
-				else {
-					/* looks like that IP is taken */
-						syslog(LOG_INFO, "free IP is not so free...");
-				}
-#endif
-#else
-				yiaddr = iplist[n];
-#endif
-			} else {
-#if DEBUG
-				syslog(LOG_INFO, "sorry.. another simultaneous client has been offered this address..");
-#endif
-			}
-		}
-		ip_leased = FALSE;
-	}
-	
-	/* If you wanted you could compare the num ip addresses leased (num_leased) to
-	 * the total num ip addresses (num_ip_addr) and determine a ratio to start 
-	 * freeing up ip addresses -- HERE */  
-	
-	if(yiaddr == 0) {
-		/* no free ip addresses remain */
-#if DEBUG
-		syslog(LOG_INFO, "no free IP addresses found in pool -- attempting to free one");
-#endif
+	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time);
 
-		/* If the ip addresses are full then there is somthing wrong 
-		 * It will only occour when a network card has been replaced on a machine thus
-		 * is very rare or there are more machines than addresses which is stoopid that
-		 * is why we should only check this when the list is full and a machine is 
-		 * requesting an IP address.
-		 * Also Arp.c should be checked to make sure all addresses are correct */
-#if EMBED
-		if ((yiaddr = freeIPAddresses(leased,num_leased)) == 0) { /* No IP addresses could be freed */
-#if DEBUG
-			syslog(LOG_ERR, "couldn't free any IP addresses -- add more to pool");
-#endif
-		} else {
-#if DEBUG
-			syslog(LOG_INFO, "i found a freeable IP address.. let's use that");
-#endif
-		}
-#else
-		syslog(LOG_INFO, "out of IP addresses -- add more to pool");
-#endif
-	} 
-	
-#if DEBUG	
-	syslog(LOG_INFO, "the IP address i'll use is %x", yiaddr);
-#endif	
-	
-	memcpy(offeredAddr[offer_num].chaddr,chaddr,16); /* cp chaddr to offered array */
-	offeredAddr[offer_num].yiaddr = yiaddr;
-	if(offer_num < MAX_SIMUL_CLIENTS)
-		offer_num++;
-	else {
-		syslog(LOG_ERR, "Ahhh!! i'm not configured to handle that many simultaneous clients!!");
-		syslog(LOG_ERR, "I'm resetteing my offer count and trying again");
-		offer_num=0;
+	curr = config.options;
+	while (curr) {
+		if (curr->data[OPT_CODE] == DHCP_LEASE_TIME) continue;
+		add_option_string(packet.options, curr->data);
+		curr = curr->next;
 	}
-	return yiaddr;
+	
+	addr.s_addr = packet.yiaddr;
+	LOG(LOG_INFO, "sending OFFER of %s", inet_ntoa(addr));
+	return send_packet(&packet, 0);
 }
 
 
-u_int32_t freeIPAddresses (u_int32_t leased[],int num_leased) {
-		int i;
-		int found;
-		
-		for(i=0;i<num_leased;i++) {
-#if EMBED
-			found = arpping(htonl(leased[i]));
-#else
-			found = arpping(leased[i]);
-#endif
-			if (found == 1) { /* if free address */ 
-				/* if it timed out without a response */
-#if DEBUG		
-					syslog(LOG_INFO, "i found a spare address %x",leased[i]);
-#endif
-				return(leased[i]);
-				break;
-			} else if (found == 0) { /* address used */
-#if DEBUG		
-				syslog(LOG_INFO, "address already active - %x",leased[i]);
-#endif
-			} 
-		}
-		return 0; /* Address not found */
+int sendNAK(struct dhcpMessage *oldpacket) {
+	struct dhcpMessage packet;
+
+	init_packet(&packet, oldpacket, DHCPNAK);
+	
+	DEBUG(LOG_INFO, "sending NAK");
+	return send_packet(&packet, 1);
 }
 
 
-/* Tests a free ip to check that it is not actually leased if it is it will
- * add the lease to the lease file and return 1
- * ret:	0 on success (not leased to another party )
- *	1 on success (actually leased to another party but lease file successfully updated)
- *	-1 error */
-int test_ip(u_int32_t ipaddr) {
-	int found;  
-	u_int8_t chaddr[16] = {0x00,0x00,0x00,0x00,
-			   	0x00,0x00,0x00,0x00,
-				0x00,0x00,0x00,0x00,
-		 	        0x00,0x00,0x00,0x00};
+int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr) {
+	struct dhcpMessage packet;
+	struct option_set *curr;
+	u_int32_t lease_time = config.lease;
+	struct in_addr addr;
 
-#if DEBUG		
-	syslog(LOG_INFO, "pinging IP to see if leased");
-#endif
-
-#if EMBED	
-	found = arpping(htonl(ipaddr));
-#else
-	found = arpping(ipaddr);
-#endif
+	init_packet(&packet, oldpacket, DHCPACK);
+	packet.yiaddr = yiaddr;
 	
-#if DEBUG
-	syslog(LOG_INFO, "arpping returned %d", found);
-#endif
-	
-	if (found == 1) { /* if free address */ 
-		/*if it timed out without a response*/
-#if DEBUG		
-		syslog(LOG_INFO, "IP is free to use");
-#endif
-		return 0;
-	} else if (found == 0) { /* address is used */
-#if DEBUG		
-		syslog(LOG_INFO, "IP is NOT free to use");
-#endif
-	/* now go add it to the leased file. */
-		if (addLeased(ipaddr, chaddr) == -1) {
-			return 1;
-		}
-#if DEBUG		
-		else {
-			syslog(LOG_INFO, "IP address leased and HW is zerod");
-		}
-#endif
+	if (get_option(oldpacket, DHCP_LEASE_TIME)) {
+		lease_time = ntohl(*((u_int32_t *)get_option(oldpacket, DHCP_LEASE_TIME)));
+		if (lease_time > config.lease) lease_time = config.lease;
+		else if (lease_time < config.min_lease) lease_time = config.lease;
 	}
-	return -1;
+	
+	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time);
+	
+	curr = config.options;
+	while (curr) {
+		if (curr->data[OPT_CODE] == DHCP_LEASE_TIME) continue;
+		add_option_string(packet.options, curr->data);
+		curr = curr->next;
+	}
+	
+	addr.s_addr = packet.yiaddr;
+	LOG(LOG_INFO, "sending ACK to %s", inet_ntoa(addr));
+
+	if (send_packet(&packet, 0) < 0) 
+		return -1;
+
+	add_lease(packet.chaddr, packet.yiaddr, lease_time);
+
+	return 0;
 }
 
+int send_inform(struct dhcpMessage *oldpacket) {
+	struct dhcpMessage packet;
+	struct option_set *curr;
+
+	init_packet(&packet, oldpacket, DHCPACK);
+	
+	curr = config.options;
+	while (curr) {
+		if (curr->data[OPT_CODE] == DHCP_LEASE_TIME) continue;
+		add_option_string(packet.options, curr->data);
+		curr = curr->next;
+	}
+
+	return send_packet(&packet, 0);
+}
+
+/* find an assignable address, it check_expired is true, we check all the expired leases as well.
+ * Maybe this should try expired leases by age... */
+u_int32_t find_address(int check_expired) 
+{
+	u_int32_t addr, ret = 0;
+	struct dhcpOfferedAddr *lease = NULL;		
+
+	addr = config.start;
+	for (;ntohl(addr) < ntohl(config.end) ;addr = htonl(ntohl(addr) + 1)) {
+
+		/* ie, 192.168.55.0 */
+		if (!(ntohl(addr) & 0xFF)) continue;
+
+		/* ie, 192.168.55.255 */
+		if ((ntohl(addr) & 0xFF) == 0xFF) continue;
+
+		/* lease is not taken */
+		if ((!(lease = find_lease_by_yiaddr(addr)) ||
+
+		     /* or it expired and we are checking for expired leases */
+		     (check_expired  && lease_expired(lease))) &&
+
+		     /* and it isn't on the network */
+	    	     !check_ip(addr)) {
+			ret = addr;
+			break;
+		}
+	}
+	return ret;
+}
+
+/* check is an IP is taken, if it is, add it to the lease table */
+int check_ip(u_int32_t addr)
+{
+	char blank_chaddr[] = {[0 ... 15] = 0};
+	struct in_addr temp;
+	
+	if (!arpping(addr)) {
+		temp.s_addr = addr;
+	 	LOG(LOG_INFO, "%s belongs to someone, reserving it for %ld seconds", 
+	 		inet_ntoa(temp), config.conflict_time);
+		add_lease(blank_chaddr, addr, config.conflict_time);
+		return 1;
+	} else return 0;
+}

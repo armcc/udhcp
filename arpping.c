@@ -5,10 +5,22 @@
  * by Yoichi Hariguchi <yoichi@fore.com>
  */
 
+#include <sys/types.h>
+#include <sys/time.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/if_ether.h>
+#include <net/if_arp.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
 
+#include "dhcpd.h"
+#include "debug.h"
 #include "arpping.h"
-
-#define DEBUG		0
 
 
 /* local prototypes */
@@ -23,66 +35,17 @@ int openRawSocket (int *s, u_short type);
  *		-1 error 
  */  
 int arpping(u_int32_t yiaddr) {
-	int rv;
 	struct ifinfo ifbuf;
-	int n;
-	static int nr = 0;
-	unsigned char *ep;
-	/*unsigned char ep[6] = {0x00,0xd0,0xcf,0x00,0x01,0x0f};*/
-	
-	/*
-	u_int32_t yiaddr = 0xcb189701;
-	u_int32_t yiaddr = 0xcb189778;
-	*/
-	
-	strcpy(ifbuf.ifname, "eth0");
-	ifbuf.addr = 0xcb1897aa; /* this addr appears to be irrelevant */
-/*	ifbuf.mask = 0xffffff00;
-	ifbuf.bcast = 0xcb1897ff; */
+
+	strcpy(ifbuf.ifname, config.interface);
+	ifbuf.addr = config.server;
 	ifbuf.mask = 0x0;
 	ifbuf.bcast = 0x0;
-
-#if CONFIG_NETtel
-	/* rip the HW addr out of the flash :-) 
-	 * points to the memory where hwaddr is located */
-	ep = (unsigned char *) (0xf0006000);/* + (nr++ * 6));*/
-#if 0
-	if ((ep[0] == 0xff) && (ep[1] == 0xff) && (ep[2] == 0xff) &&
-	    (ep[3] == 0xff) && (ep[4] == 0xff) && (ep[5] == 0xff)) {
-#if DEBUG
-		syslog(LOG_INFO, "DHCPD - oops! bad hwaddr (0xff)");
-#endif
-		return -1;
-	} else if ((ep[0] == 0) && (ep[1] == 0) && (ep[2] == 0) &&
-	    (ep[3] == 0) && (ep[4] == 0) && (ep[5] == 0)) {
-#if DEBUG
-		syslog(LOG_INFO, "DHCPD - oops! bad hwaddr (0x00)");
-#endif
-		return -1;
-	}
-#endif
-#endif
 	
-#if 0
-	printf("arpping hwaddr: ");
-#endif
-	for(n=0;n<6;n++) {
-#if 0
-		printf("%02x", ep[n]);
-#endif
-		ifbuf.haddr[n] = ep[n];
-	}
-#if 0
-	printf("\n");
-#endif
+	memcpy(ifbuf.haddr, config.arp, 6);
 	ifbuf.flags = 0;
 	
-	rv = arpCheck(yiaddr, &ifbuf, 3);
-#if 0
-	printf("rv = %d (1=free, 0=used)\n", rv);
-#endif
-	
-	return rv;
+	return arpCheck(yiaddr, &ifbuf, 2);
 }
 
 
@@ -102,12 +65,7 @@ int arpCheck(u_long inaddr, struct ifinfo *ifbuf, long timeout)  {
 	mkArpMsg(ARPOP_REQUEST, inaddr, NULL, ifbuf->addr, ifbuf->haddr, &arp);
 	bzero(&addr, sizeof(addr));
 	strcpy(addr.sa_data, ifbuf->ifname);
-	if ( sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0 ) {
-#if 0
-		printf("sendto (arpCheck)");
-#endif
-		rv = 0;
-	}
+	if ( sendto(s, &arp, sizeof(arp), 0, &addr, sizeof(addr)) < 0 ) rv = 0;
 	
 	/* wait arp reply, and check it */
 	tm.tv_usec = 0;
@@ -117,19 +75,14 @@ int arpCheck(u_long inaddr, struct ifinfo *ifbuf, long timeout)  {
 		FD_SET(s, &fdset);
 		tm.tv_sec  = timeout;
 		if ( select(s+1, &fdset, (fd_set *)NULL, (fd_set *)NULL, &tm) < 0 ) {
-#if 0
-			printf("select (arpCheck)");
-#endif
-			rv = 0;
-		}
-		if ( FD_ISSET(s, &fdset) ) {
-			if (recv(s, &arp, sizeof(arp), 0) < 0 ) {
-#if 0
-				printf("recv (arpCheck)");
-#endif
-				rv = 0;
-			}
-			if(arp.operation == htons(ARPOP_REPLY) && bcmp(arp.tHaddr, ifbuf->haddr, 6) == 0 && *((u_int *)arp.sInaddr) == inaddr ) {
+			DEBUG(LOG_ERR, "Error on ARPING request: %s", sys_errlist[errno]);
+			if (errno != EINTR) rv = 0;
+		} else if ( FD_ISSET(s, &fdset) ) {
+			if (recv(s, &arp, sizeof(arp), 0) < 0 ) rv = 0;
+			if(arp.operation == htons(ARPOP_REPLY) && 
+			   bcmp(arp.tHaddr, ifbuf->haddr, 6) == 0 && 
+			   *((u_int *)arp.sInaddr) == inaddr ) {
+				DEBUG(LOG_INFO, "Valid arp reply receved for this address");
 				rv = 0;
 				break;
 			}
@@ -138,6 +91,7 @@ int arpCheck(u_long inaddr, struct ifinfo *ifbuf, long timeout)  {
 		time(&prevTime);
 	}
 	close(s);
+	DEBUG(LOG_INFO, "%salid arp replies for this address", rv ? "No v" : "V");	 
 	return rv;
 }
 
@@ -155,9 +109,8 @@ void mkArpMsg(int opcode, u_long tInaddr, u_char *tHaddr,
 	*((u_int *)msg->sInaddr) = sInaddr;		/* source IP address */
 	bcopy(sHaddr, msg->sHaddr, 6);			/* source hardware address */
 	*((u_int *)msg->tInaddr) = tInaddr;		/* target IP address */
-	if ( opcode == ARPOP_REPLY ) {
+	if ( opcode == ARPOP_REPLY )
 		bcopy(tHaddr, msg->tHaddr, 6);		/* target hardware address */
-	}
 }
 
 
@@ -165,19 +118,14 @@ int openRawSocket (int *s, u_short type) {
 	int optval = 1;
 
 	if((*s = socket (AF_INET, SOCK_PACKET, htons (type))) == -1) {
-#if 0
-		perror("socket");
-		printf("socket err\n");
-#endif	
+		LOG(LOG_ERR, "Could not open raw socket");
 		return -1;
 	}
 	
 	if(setsockopt (*s, SOL_SOCKET, SO_BROADCAST, &optval, sizeof (optval)) == -1) {
-#if 0
-		perror("setsockopt");
-		printf("setsockopt err\n");
-#endif	
+		LOG(LOG_ERR, "Could not setsocketopt on raw socket");
 		return -1;
-    }
+	}
+	return 0;
 }
 

@@ -7,17 +7,10 @@
 
 #define MAC_BCAST_ADDR	"\xff\xff\xff\xff\xff\xff"
 
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <linux/netdevice.h>
-#include <linux/if_ether.h>
-#include <linux/if_arp.h>
+#include <netinet/if_ether.h>
+#include <net/if_arp.h>
+#include <net/if.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
 
 
 struct arpMsg {

@@ -1,10 +1,15 @@
 /* options.h */
+#ifndef _OPTIONS_H
+#define _OPTIONS_H
 
-unsigned char *getOption(unsigned char *options, int option_val);
-int endOption(unsigned char **optionptr);
-int addOption(unsigned char *optionptr, unsigned char code, char datalength, char *data);
-int addOptionMulti(unsigned char *optionptr, unsigned char code, 
-			char datalength, char *data,int mul);
-int add_multiple_option(unsigned char *optionptr, unsigned char code, 
-			char datalength, char *data1, char *data2, char *data3);
+#include "files.h"
 
+unsigned char *get_option(struct dhcpMessage *packet, int code);
+int end_option(unsigned char *optionptr);
+int add_option_string(unsigned char *optionptr, unsigned char *string);
+int add_stored_option(unsigned char *optionptr, unsigned char code);
+int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t data);
+struct option_set *find_option(struct option_set *opt_list, char code);
+void attach_option(struct option_set **opt_list, struct dhcp_option *option, char *buffer, int length);
+
+#endif
