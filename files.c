@@ -3,7 +3,6 @@
  * Rewrite by Russ Dill <Russ.Dill@asu.edu> July 2001
  */
  
-#include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <string.h>
@@ -163,7 +162,7 @@ static struct config_keyword keywords[] = {
 	{"conflict_time",read_u32,&(server_config.conflict_time),"3600"},
 	{"offer_time",	read_u32, &(server_config.offer_time),	"60"},
 	{"min_lease",	read_u32, &(server_config.min_lease),	"60"},
-	{"lease_file",	read_str, &(server_config.lease_file),	"/var/lib/misc/udhcpd.leases"},
+	{"lease_file",	read_str, &(server_config.lease_file),	LEASES_FILE},
 	{"pidfile",	read_str, &(server_config.pidfile),	"/var/run/udhcpd.pid"},
 	{"notify_file", read_str, &(server_config.notify_file),	""},
 	{"siaddr",	read_ip,  &(server_config.siaddr),	"0.0.0.0"},

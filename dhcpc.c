@@ -100,6 +100,7 @@ static void __attribute__ ((noreturn)) show_usage(void)
 	exit(0);
 }
 #else
+#define show_usage bb_show_usage
 extern void show_usage(void) __attribute__ ((noreturn));
 #endif
 
