@@ -219,16 +219,13 @@ int read_config(char *file)
 }
 
 
-/* the dummy var is here so this can be a signal handler */
-void write_leases(int dummy)
+void write_leases(void)
 {
 	FILE *fp;
 	unsigned int i;
 	char buf[255];
 	time_t curr = time(0);
 	unsigned long lease_time;
-	
-	dummy = 0;
 	
 	if (!(fp = fopen(server_config.lease_file, "w"))) {
 		LOG(LOG_ERR, "Unable to open %s for writing", server_config.lease_file);

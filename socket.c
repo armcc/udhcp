@@ -1,7 +1,7 @@
 /*
  * socket.c -- DHCP server client/server socket creation
  *
- * Moreton Bay DHCP Server
+ * udhcp client/server
  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
  *			Chris Trew <ctrew@moreton.com.au>
  *
@@ -153,6 +153,5 @@ int raw_socket(int ifindex)
 	}
 
 	return fd;
-
 }
 

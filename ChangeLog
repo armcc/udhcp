@@ -1,4 +1,11 @@
 0.9.8 (pending)
++ updated client manpage (me)
++ both client and server now use sockets for signal handling,
+  hopefully, this will be the last needed change in signal
+  handling, I'm fairly certain all the possible races are now
+  closed. (me)
++ The server now restarts the auto_time timer when it receives
+  a SIGUSR1 (write out config file). (me)
 + Improve signal handling (David Poole)
 + Fix to config file parsing (Matt Kraai)
 + Fix load lease logic (me)

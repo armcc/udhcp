@@ -1,6 +1,6 @@
 /* dhcpd.c
  *
- * Moreton Bay DHCP Server
+ * udhcp Server
  * Copyright (C) 1999 Matthew Ramsay <matthewr@moreton.com.au>
  *			Chris Trew <ctrew@moreton.com.au>
  *
@@ -54,7 +54,7 @@
 /* globals */
 struct dhcpOfferedAddr *leases;
 struct server_config_t server_config;
-
+static int signal_pipe[2];
 
 /* Exit and cleanup */
 static void exit_server(int retval)
@@ -65,12 +65,13 @@ static void exit_server(int retval)
 }
 
 
-/* SIGTERM handler */
-static void udhcpd_killed(int sig)
+/* Signal handler */
+static void signal_handler(int sig)
 {
-	sig = 0;
-	LOG(LOG_INFO, "Received SIGTERM");
-	exit_server(0);
+	if (send(signal_pipe[1], &sig, sizeof(sig), MSG_DONTWAIT) < 0) {
+		LOG(LOG_ERR, "Could not send signal: %s", 
+			strerror(errno));
+	}
 }
 
 
@@ -92,6 +93,8 @@ int main(int argc, char *argv[])
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
 	int pid_fd;
+	int max_sock;
+	int sig;
 	
 	OPEN_LOG("udhcpd");
 	LOG(LOG_INFO, "udhcp server (v%s) started", VERSION);
@@ -129,8 +132,9 @@ int main(int argc, char *argv[])
 #endif
 
 
-	signal(SIGUSR1, write_leases);
-	signal(SIGTERM, udhcpd_killed);
+	socketpair(AF_UNIX, SOCK_STREAM, 0, signal_pipe);
+	signal(SIGUSR1, signal_handler);
+	signal(SIGTERM, signal_handler);
 
 	timeout_end = time(0) + server_config.auto_time;
 	while(1) { /* loop until universe collapses */
@@ -143,26 +147,42 @@ int main(int argc, char *argv[])
 
 		FD_ZERO(&rfds);
 		FD_SET(server_socket, &rfds);
+		FD_SET(signal_pipe[0], &rfds);
 		if (server_config.auto_time) {
 			tv.tv_sec = timeout_end - time(0);
-			if (tv.tv_sec <= 0) {
-				tv.tv_sec = server_config.auto_time;
-				timeout_end = time(0) + server_config.auto_time;
-				write_leases(0);
-			}
 			tv.tv_usec = 0;
 		}
-		retval = select(server_socket + 1, &rfds, NULL, NULL, server_config.auto_time ? &tv : NULL);
+		if (!server_config.auto_time || tv.tv_sec > 0) {
+			max_sock = server_socket > signal_pipe[0] ? server_socket : signal_pipe[0];
+			retval = select(max_sock + 1, &rfds, NULL, NULL, 
+					server_config.auto_time ? &tv : NULL);
+		} else retval = 0; /* If we already timed out, fall through */
 
 		if (retval == 0) {
-			write_leases(0);
+			write_leases();
 			timeout_end = time(0) + server_config.auto_time;
 			continue;
-		} else if (retval < 0) {
+		} else if (retval < 0 && errno != EINTR) {
 			DEBUG(LOG_INFO, "error on select");
 			continue;
 		}
 		
+		if (FD_ISSET(signal_pipe[0], &rfds)) {
+			if (read(signal_pipe[0], &sig, sizeof(sig)) < 0)
+				continue; /* probably just EINTR */
+			switch (sig) {
+			case SIGUSR1:
+				LOG(LOG_INFO, "Received a SIGUSR1");
+				write_leases();
+				/* why not just reset the timeout, eh */
+				timeout_end = time(0) + server_config.auto_time;
+				continue;
+			case SIGTERM:
+				LOG(LOG_INFO, "Received a SIGTERM");
+				exit_server(0);
+			}
+		}
+
 		if ((bytes = get_packet(&packet, server_socket)) < 0) { /* this waits for a packet - idle */
 			if (bytes == -1 && errno != EINTR) {
 				DEBUG(LOG_INFO, "error on read, %s, reopening socket", strerror(errno));

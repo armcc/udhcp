@@ -20,6 +20,10 @@ Do not fork after obtaining a lease.
 Send the client hostname
 .IR HOSTNAME .
 .TP
+.BI \-h\  HOSTNAME
+Alias for -H
+.IR HOSTNAME .
+.TP
 .BI \-i\  INTERFACE ,\ \-\-interface= INTERFACE
 Configure
 .IR INTERFACE .
@@ -47,7 +51,7 @@ Display version.
 .SH USAGE
 When an event occurs,
 .B udhcpc
-executes a script.  There are three possible arguments to this
+executes a script.  There are four possible arguments to this
 script:
 .TP
 .B deconfig
@@ -68,9 +72,22 @@ configure the interface and set any other relevant parameters
 .B renew
 .B renew
 is used when
-.B udhcpc when a lease is renewed.  The interface is already
+.B udhcpc
+when a lease is renewed.  The interface is already
 configured, so the IP address will not change.  Other parameters
 (e.g., default gateway, subnet mask, dns server) may.
+.TP
+.B nak
+.B nak
+is used when
+.B udhcpc
+receieves a NAK packet from the server. The
+enviromental variable
+.B $message
+will contain the reason for the
+NAK message if the server included one. Processing this message
+is optional, as the script will also be called with deconfig if
+need be.
 .PP
 Parameters are passed to the script via the following environment
 variables:
@@ -162,6 +179,9 @@ The DHCP message type (safely ignored).
 .TP
 .B serverid
 The server IP address.
+.TP
+.B message
+Reason for a DHCPNAK.
 .TP
 .B tftp
 The TFTP server name.

@@ -52,9 +52,7 @@ static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
 static int fd;
-static int renew_requested; /* = 0 */
-static int release_requested; /* = 0 */
-static int term_received; /* = 0 */
+static int signal_pipe[2];
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
@@ -177,10 +175,9 @@ static void exit_client(int retval)
 /* Signal handler */
 static void signal_handler(int sig)
 {
-	switch (sig) {
-	case SIGUSR1: renew_requested = 1; break;
-	case SIGUSR2: release_requested = 1; break;
-	case SIGTERM: term_received = 1; break;
+	if (send(signal_pipe[1], &sig, sizeof(sig), MSG_DONTWAIT) < 0) {
+		LOG(LOG_ERR, "Could not send signal: %s",
+			strerror(errno));
 	}
 }
 
@@ -217,6 +214,8 @@ int main(int argc, char *argv[])
 	struct in_addr temp_addr;
 	int pid_fd;
 	time_t now;
+	int max_fd;
+	int sig;
 
 	static struct option options[] = {
 		{"clientid",	required_argument,	0, 'c'},
@@ -313,6 +312,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* setup signal handlers */
+	socketpair(AF_UNIX, SOCK_STREAM, 0, signal_pipe);
 	signal(SIGUSR1, signal_handler);
 	signal(SIGUSR2, signal_handler);
 	signal(SIGTERM, signal_handler);
@@ -338,10 +338,12 @@ int main(int argc, char *argv[])
 			}
 		}
 		if (fd >= 0) FD_SET(fd, &rfds);
-		
+		FD_SET(signal_pipe[0], &rfds);		
+
 		if (tv.tv_sec > 0) {
 			DEBUG(LOG_INFO, "Waiting on select...\n");
-			retval = select(fd + 1, &rfds, NULL, NULL, &tv);
+			max_fd = signal_pipe[0] > fd ? signal_pipe[0] : fd;
+			retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
 		} else retval = 0; /* If we already timed out, fall through */
 
 		now = time(0);
@@ -524,21 +526,26 @@ int main(int argc, char *argv[])
 				}
 				break;
 			/* case BOUND, RELEASED: - ignore all packets */
-			}					
-		} else if (retval == -1 && errno == EINTR) {
-			/* a signal was caught */
-			if (release_requested) {
-				perform_release();
-				release_requested = 0;
+			}	
+		} else if (retval > 0 && FD_ISSET(signal_pipe[0], &rfds)) {
+			if (read(signal_pipe[0], &sig, sizeof(signal)) < 0) {
+				DEBUG(LOG_ERR, "Could not read signal: %s", 
+					strerror(errno));
+				continue; /* probably just EINTR */
 			}
-			if (renew_requested) {
+			switch (sig) {
+			case SIGUSR1: 
 				perform_renew();
-				renew_requested = 0;
-			}
-			if (term_received) {
+				break;
+			case SIGUSR2:
+				perform_release();
+				break;
+			case SIGTERM:
 				LOG(LOG_INFO, "Received SIGTERM");
 				exit_client(0);
-			}			
+			}
+		} else if (retval == -1 && errno == EINTR) {
+			/* a signal was caught */		
 		} else {
 			/* An error occured */
 			DEBUG(LOG_ERR, "Error on select");
