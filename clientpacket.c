@@ -129,6 +129,7 @@ int send_renew(unsigned long xid, unsigned long server, unsigned long ciaddr)
 	packet.xid = xid;
 	packet.ciaddr = ciaddr;
 
+	add_requests(&packet);
 	LOG(LOG_DEBUG, "Sending renew...");
 	if (server) 
 		ret = kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);
