@@ -16,6 +16,7 @@
 #include "leases.h"
 #include "arpping.h"
 
+unsigned char blank_chaddr[] = {[0 ... 15] = 0};
 
 /* clear every lease out that chaddr OR yiaddr matches and is nonzero */
 void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr)
@@ -137,7 +138,6 @@ u_int32_t find_address(int check_expired)
 /* check is an IP is taken, if it is, add it to the lease table */
 int check_ip(u_int32_t addr)
 {
-	unsigned char blank_chaddr[] = {[0 ... 15] = 0};
 	struct in_addr temp;
 	
 	if (arpping(addr, server_config.server, server_config.arp, server_config.interface) == 0) {
