@@ -81,6 +81,7 @@ static void print_usage(void)
 "Usage: udhcpcd [OPTIONS]\n\n"
 "  -c, --clientid=CLIENTID         Client identifier\n"
 "  -H, --hostname=HOSTNAME         Client hostname\n"
+"  -h                              Alias for -H\n"
 "  -f, --foreground                Do not fork after getting lease\n"
 "  -b, --background                Fork to background if lease cannot be\n"
 "                                  immediately negotiated.\n"
@@ -211,7 +212,7 @@ int main(int argc, char *argv[])
 		{"foreground",	no_argument,		0, 'f'},
 		{"background",	no_argument,		0, 'b'},
 		{"hostname",	required_argument,	0, 'H'},
-		{"help",	no_argument,		0, 'h'},
+		{"hostname",    required_argument,      0, 'h'},
 		{"interface",	required_argument,	0, 'i'},
 		{"now", 	no_argument,		0, 'n'},
 		{"pidfile",	required_argument,	0, 'p'},
@@ -219,13 +220,14 @@ int main(int argc, char *argv[])
 		{"request",	required_argument,	0, 'r'},
 		{"script",	required_argument,	0, 's'},
 		{"version",	no_argument,		0, 'v'},
+		{"help",	no_argument,		0, '?'},
 		{0, 0, 0, 0}
 	};
 
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:fbH:hi:np:qr:s:v", options, &option_index);
+		c = getopt_long(argc, argv, "c:fbH:h:i:np:qr:s:v", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
@@ -244,6 +246,7 @@ int main(int argc, char *argv[])
 		case 'b':
 			client_config.background_if_no_lease = 1;
 			break;
+		case 'h':
 		case 'H':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
 			if (client_config.hostname) free(client_config.hostname);
@@ -252,9 +255,6 @@ int main(int argc, char *argv[])
 			client_config.hostname[OPT_LEN] = len;
 			strncpy(client_config.hostname + 2, optarg, len);
 			break;
-		case 'h':
-			print_usage();
-			return 0;
 		case 'i':
 			client_config.interface =  optarg;
 			break;
@@ -277,6 +277,9 @@ int main(int argc, char *argv[])
 			printf("udhcpcd, version %s\n\n", VERSION);
 			exit_client(0);
 			break;
+		default:
+			print_usage();
+			return 0;
 		}
 	}
 

@@ -1,4 +1,5 @@
 0.9.8 (pending)
++ -h is now an alias for -H (udhcp bug #1253)
 + Shorter timeout on not receiving offers (me)
 + Improved signal behavior by client (me)
 + Would never assign end address (Keith Smith <keith@ksmith.com>)
