@@ -1,3 +1,10 @@
+0.9.2 (pending)
++ Added raw sockets to client (me)
++ alignment fixes (Mark Huang)
++ compiler warning fixes (Mark Huang)
++ client now sends parameter list (Mark Huang/me)
++ added ipttl option
+
 0.9.1 (010806)
 + Added udhcpc client
 + reorganized functions/files
