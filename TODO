@@ -1,5 +1,6 @@
 TODO
 ----
++ sanity code for option[OPT_LEN]
 + fix aliasing (ie: eth0:0)
 + DONE: Make sure get_raw_packet only accepts packets on the specified interface
 + better standard linux distro support
