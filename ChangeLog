@@ -1,4 +1,5 @@
 0.9.7 (pending)
++ Set BOOTREQUEST/REPLY properly
 + Change client-identifier field to popularly expected behavior (me)
 + Only reopen port on errors (me)
 + Change fork/close/setsid structures to daemon() (me)

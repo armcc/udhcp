@@ -23,7 +23,18 @@
 void init_header(struct dhcpMessage *packet, char type)
 {
 	memset(packet, 0, sizeof(struct dhcpMessage));
-	packet->op = BOOTREQUEST;
+	switch (type) {
+	case DHCPDISCOVER:
+	case DHCPREQUEST:
+	case DHCPRELEASE:
+	case DHCPINFORM:
+		packet->op = BOOTREQUEST;
+		break;
+	case DHCPOFFER:
+	case DHCPACK:
+	case DHCPNAK:
+		packet->op = BOOTREPLY;
+	}
 	packet->htype = ETH_10MB;
 	packet->hlen = ETH_10MB_LEN;
 	packet->cookie = htonl(DHCP_MAGIC);
