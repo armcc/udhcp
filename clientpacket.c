@@ -164,6 +164,7 @@ int send_release(unsigned long server, unsigned long ciaddr)
 }
 
 
+/* return -1 on errors that are fatal for the socket, -2 for those that aren't */
 int get_raw_packet(struct dhcpMessage *payload, int fd)
 {
 	int bytes;
@@ -181,12 +182,12 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 	
 	if (bytes < (int) (sizeof(struct iphdr) + sizeof(struct udphdr))) {
 		DEBUG(LOG_INFO, "message too short, ignoring");
-		return -1;
+		return -2;
 	}
 	
 	if (bytes < ntohs(packet.ip.tot_len)) {
 		DEBUG(LOG_INFO, "Truncated packet");
-		return -1;
+		return -2;
 	}
 	
 	/* ignore any extra garbage bytes */
@@ -198,7 +199,7 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 	    bytes > (int) sizeof(struct udp_dhcp_packet) ||
 	    ntohs(packet.udp.len) != (short) (bytes - sizeof(packet.ip))) {
 	    	DEBUG(LOG_INFO, "unrelated/bogus packet");
-	    	return -1;
+	    	return -2;
 	}
 
 	/* check IP checksum */
@@ -222,14 +223,14 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 	packet.ip.tot_len = packet.udp.len; /* cheat on the psuedo-header */
 	if (check && check != checksum(&packet, bytes)) {
 		DEBUG(LOG_ERR, "packet with bad UDP checksum received, ignoring");
-		return -1;
+		return -2;
 	}
 	
 	memcpy(payload, &(packet.data), bytes - (sizeof(packet.ip) + sizeof(packet.udp)));
 	
 	if (ntohl(payload->cookie) != DHCP_MAGIC) {
 		LOG(LOG_ERR, "received bogus message (bad magic) -- ignoring");
-		return -1;
+		return -2;
 	}
 	DEBUG(LOG_INFO, "oooooh!!! got some!");
 	return bytes - (sizeof(packet.ip) + sizeof(packet.udp));
