@@ -85,7 +85,7 @@ static void fill_options(char *dest, char *option, struct dhcp_option *type)
 	struct in_addr in;
 	
 	if ((type->flags & TYPE_MASK) == OPTION_STRING) {
-		strncpy(dest, option, option[OPT_LEN]);
+		strncpy(dest, option, option[OPT_LEN - 2]);
 		dest[(int) option[OPT_LEN - 2]] = '\0';
 		return;
 	}
