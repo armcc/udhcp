@@ -19,7 +19,7 @@
 #include "leases.h"
 
 /* on these functions, make sure you datatype matches */
-static int read_ip(const char *line, void *arg)
+static int read_ip(char *line, void *arg)
 {
 	struct in_addr *addr = arg;
 	struct hostent *host;
@@ -34,7 +34,7 @@ static int read_ip(const char *line, void *arg)
 }
 
 
-static int read_str(const char *line, void *arg)
+static int read_str(char *line, void *arg)
 {
 	char **dest = arg;
 	
@@ -45,7 +45,7 @@ static int read_str(const char *line, void *arg)
 }
 
 
-static int read_u32(const char *line, void *arg)
+static int read_u32(char *line, void *arg)
 {
 	u_int32_t *dest = arg;
 	char *endptr;
@@ -54,7 +54,7 @@ static int read_u32(const char *line, void *arg)
 }
 
 
-static int read_yn(const char *line, void *arg)
+static int read_yn(char *line, void *arg)
 {
 	char *dest = arg;
 	int retval = 1;
@@ -174,7 +174,7 @@ static struct config_keyword keywords[] = {
 };
 
 
-int read_config(const char *file)
+int read_config(char *file)
 {
 	FILE *in;
 	char buffer[80], orig[80], *token, *line;
@@ -259,7 +259,7 @@ void write_leases(void)
 }
 
 
-void read_leases(const char *file)
+void read_leases(char *file)
 {
 	FILE *fp;
 	unsigned int i = 0;
