@@ -189,12 +189,13 @@ int main(int argc, char *argv[])
 	unsigned long t1 = 0, t2 = 0, xid = 0;
 	unsigned long start = 0, lease;
 	fd_set rfds;
-	int fd, retval;
+	int fd = -1, retval;
 	struct timeval tv;
 	int c, len;
 	struct dhcpMessage packet;
 	struct in_addr temp_addr;
 	int pid_fd;
+	time_t now;
 
 	static struct option options[] = {
 		{"clientid",	required_argument,	0, 'c'},
@@ -288,27 +289,27 @@ int main(int argc, char *argv[])
 			fd = -1;
 		}
 		
-		if (listen_mode == LISTEN_KERNEL) {
-			if ((fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface)) < 0) {
-				LOG(LOG_ERR, "couldn't create server socket -- au revoir");
-				exit_client(0);
-			}			
-		} else if (listen_mode == LISTEN_RAW) {
-			if ((fd = raw_socket(client_config.ifindex)) < 0) {
-				LOG(LOG_ERR, "couldn't create raw socket -- au revoir");
-				exit_client(0);
-			}			
-		} else fd = -1;
-
 		tv.tv_sec = timeout - time(0);
 		tv.tv_usec = 0;
 		FD_ZERO(&rfds);
-		if (listen_mode) FD_SET(fd, &rfds);
+
+		if (listen_mode != LISTEN_NONE) {
+			if (listen_mode == LISTEN_KERNEL)
+				fd = listen_socket(INADDR_ANY, CLIENT_PORT, client_config.interface);
+			else
+				fd = raw_socket(client_config.ifindex);
+			if (fd < 0) {
+				LOG(LOG_ERR, "FATAL: couldn't listen on socket");
+				exit_client(0);
+			}
+			FD_SET(fd, &rfds);		
+		}
 		
 		if (tv.tv_sec > 0) {
 			retval = select(fd + 1, &rfds, NULL, NULL, &tv);
 		} else retval = 0; /* If we already timed out, fall through */
 		
+		now = time(0);
 		if (retval == 0) {
 			/* timeout dropped to zero */
 			switch (state) {
@@ -320,17 +321,16 @@ int main(int argc, char *argv[])
 					/* send discover packet */
 					send_discover(xid, requested_ip); /* broadcast */
 					
-					timeout = time(0) + ((packet_num == 2) ? 10 : 2);
+					timeout = now + ((packet_num == 2) ? 10 : 2);
 					packet_num++;
 				} else {
 					if (client_config.abort_if_no_lease) {
-						LOG(LOG_INFO,
-						    "No lease, failing.");
+						LOG(LOG_INFO, "No lease, failing.");
 						exit_client(1);
 				  	}
 					/* wait to try again */
 					packet_num = 0;
-					timeout = time(0) + 60;
+					timeout = now + 60;
 				}
 				break;
 			case RENEW_REQUESTED:
@@ -341,15 +341,14 @@ int main(int argc, char *argv[])
 						send_renew(xid, server_addr, requested_ip); /* unicast */
 					else send_selecting(xid, server_addr, requested_ip); /* broadcast */
 					
-					timeout = time(0) + ((packet_num == 2) ? 10 : 2);
+					timeout = now + ((packet_num == 2) ? 10 : 2);
 					packet_num++;
 				} else {
 					/* timed out, go back to init state */
 					state = INIT_SELECTING;
-					timeout = time(0);
+					timeout = now;
 					packet_num = 0;
 					listen_mode = LISTEN_RAW;
-					
 				}
 				break;
 			case BOUND:
@@ -363,7 +362,7 @@ int main(int argc, char *argv[])
 				if ((t2 - t1) <= (lease / 14400 + 1)) {
 					/* timed out, enter rebinding state */
 					state = REBINDING;
-					timeout = time(0) + (t2 - t1);
+					timeout = now + (t2 - t1);
 					DEBUG(LOG_INFO, "Entering rebinding state");
 				} else {
 					/* send a request packet */
@@ -380,7 +379,7 @@ int main(int argc, char *argv[])
 					state = INIT_SELECTING;
 					LOG(LOG_INFO, "Lease lost, entering init state");
 					run_script(NULL, "deconfig");
-					timeout = time(0);
+					timeout = now;
 					packet_num = 0;
 					listen_mode = LISTEN_RAW;
 				} else {
@@ -427,7 +426,7 @@ int main(int argc, char *argv[])
 						
 						/* enter requesting state */
 						state = REQUESTING;
-						timeout = time(0);
+						timeout = now;
 						packet_num = 0;
 					} else {
 						DEBUG(LOG_ERR, "No server ID in message");
@@ -441,7 +440,7 @@ int main(int argc, char *argv[])
 				if (*message == DHCPACK) {
 					if (!(temp = get_option(&packet, DHCP_LEASE_TIME))) {
 						LOG(LOG_ERR, "No lease time with ACK, using 1 hour lease");
-						lease = 60*60;
+						lease = 60 * 60;
 					} else {
 						memcpy(&lease, temp, 4);
 						lease = ntohl(lease);
@@ -455,7 +454,7 @@ int main(int argc, char *argv[])
 					temp_addr.s_addr = packet.yiaddr;
 					LOG(LOG_INFO, "Lease of %s obtained, lease time %ld", 
 						inet_ntoa(temp_addr), lease);
-					start = time(0);
+					start = now;
 					timeout = t1 + start;
 					requested_ip = packet.yiaddr;
 					run_script(&packet,
@@ -471,16 +470,13 @@ int main(int argc, char *argv[])
 					if (state != REQUESTING)
 						run_script(NULL, "deconfig");
 					state = INIT_SELECTING;
-					timeout = time(0);
+					timeout = now;
 					requested_ip = 0;
 					packet_num = 0;
 					listen_mode = LISTEN_RAW;
 				}
 				break;
-			case BOUND:
-			case RELEASED:
-				/* ignore all packets */
-				break;
+			/* case BOUND, RELEASED: - ignore all packets */
 			}					
 		} else if (retval == -1 && errno == EINTR) {
 			/* a signal was caught */

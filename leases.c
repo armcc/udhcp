@@ -20,15 +20,13 @@
 /* clear every lease out that chaddr OR yiaddr matches and is nonzero */
 void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr)
 {
-	unsigned int i, blank_chaddr = 0, blank_yiaddr = 0;
+	unsigned int i, j;
 	
-	for (i = 0; i < 16 && !chaddr[i]; i++);
-	if (i == 16) blank_chaddr = 1;
-	blank_yiaddr = (yiaddr == 0);
+	for (j = 0; j < 16 && !chaddr[j]; j++);
 	
 	for (i = 0; i < server_config.max_leases; i++)
-		if ((!blank_chaddr && !memcmp(leases[i].chaddr, chaddr, 16)) ||
-		    (!blank_yiaddr && leases[i].yiaddr == yiaddr)) {
+		if ((j != 16 && !memcmp(leases[i].chaddr, chaddr, 16)) ||
+		    (!yiaddr && leases[i].yiaddr == yiaddr)) {
 			memset(&(leases[i]), 0, sizeof(struct dhcpOfferedAddr));
 		}
 }
@@ -107,31 +105,32 @@ struct dhcpOfferedAddr *find_lease_by_yiaddr(u_int32_t yiaddr)
  * Maybe this should try expired leases by age... */
 u_int32_t find_address(int check_expired) 
 {
-	u_int32_t addr, ret = 0;
+	u_int32_t addr, ret;
 	struct dhcpOfferedAddr *lease = NULL;		
 
-	addr = server_config.start;
-	for (;ntohl(addr) < ntohl(server_config.end) ;addr = htonl(ntohl(addr) + 1)) {
+	addr = ntohl(server_config.start); /* addr is in host order here */
+	for (;addr < ntohl(server_config.end); addr++) {
 
 		/* ie, 192.168.55.0 */
-		if (!(ntohl(addr) & 0xFF)) continue;
+		if (!(addr & 0xFF)) continue;
 
 		/* ie, 192.168.55.255 */
-		if ((ntohl(addr) & 0xFF) == 0xFF) continue;
+		if ((addr & 0xFF) == 0xFF) continue;
 
 		/* lease is not taken */
-		if ((!(lease = find_lease_by_yiaddr(addr)) ||
+		ret = htonl(addr);
+		if ((!(lease = find_lease_by_yiaddr(ret)) ||
 
 		     /* or it expired and we are checking for expired leases */
 		     (check_expired  && lease_expired(lease))) &&
 
 		     /* and it isn't on the network */
-	    	     !check_ip(addr)) {
-			ret = addr;
+	    	     !check_ip(ret)) {
+			return ret;
 			break;
 		}
 	}
-	return ret;
+	return 0;
 }
 
 
@@ -141,7 +140,7 @@ int check_ip(u_int32_t addr)
 	char blank_chaddr[] = {[0 ... 15] = 0};
 	struct in_addr temp;
 	
-	if (!arpping(addr, server_config.server, server_config.arp, server_config.interface)) {
+	if (arpping(addr, server_config.server, server_config.arp, server_config.interface) == 0) {
 		temp.s_addr = addr;
 	 	LOG(LOG_INFO, "%s belongs to someone, reserving it for %ld seconds", 
 	 		inet_ntoa(temp), server_config.conflict_time);

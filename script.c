@@ -38,39 +38,21 @@
 #include "debug.h"
 
 /* get a rough idea of how long an option will be (rounding up...) */
-static int max_option_length(char *option, struct dhcp_option *type)
-{
-	int size = 0;
-	
-	switch (type->flags & TYPE_MASK) {
-	case OPTION_IP:
-	case OPTION_IP_PAIR:
-		size = (option[OPT_LEN - 2] / 4) * sizeof("255.255.255.255 ");
-		break;
-	case OPTION_STRING:
-		size = option[OPT_LEN - 2] + 1;
-		break;
-	case OPTION_BOOLEAN:
-		size = option[OPT_LEN - 2] * sizeof("yes ");
-		break;
-	case OPTION_U8:
-		size = option[OPT_LEN - 2] * sizeof("255 ");
-		break;
-	case OPTION_U16:
-		size = (option[OPT_LEN - 2] / 2) * sizeof("65535 ");
-		break;
-	case OPTION_S16:
-		size = (option[OPT_LEN - 2] / 2) * sizeof("-32768 ");
-		break;
-	case OPTION_U32:
-		size = (option[OPT_LEN - 2] / 4) * sizeof("4294967295 ");
-		break;
-	case OPTION_S32:
-		size = (option[OPT_LEN - 2] / 4) * sizeof("-2147483684 ");
-		break;
-	}
-	
-	return size;
+static int max_option_length[] = {
+	[OPTION_IP] =		sizeof("255.255.255.255 "),
+	[OPTION_IP_PAIR] =	sizeof("255.255.255.255 ") * 2,
+	[OPTION_STRING] =	1,
+	[OPTION_BOOLEAN] =	sizeof("yes "),
+	[OPTION_U8] =		sizeof("255 "),
+	[OPTION_U16] =		sizeof("65535 "),
+	[OPTION_S16] =		sizeof("-32768 "),
+	[OPTION_U32] =		sizeof("4294967295 "),
+	[OPTION_S32] =		sizeof("-2147483684 "),
+};
+
+
+static int sprintip(char *dest, char *pre, unsigned char *ip) {
+	return sprintf(dest, "%s%d.%d.%d.%d ", pre, ip[0], ip[1], ip[2], ip[3]);
 }
 
 
@@ -90,39 +72,35 @@ static void fill_options(char *dest, unsigned char *option, struct dhcp_option *
 	optlen = option_lengths[type];
 	for(;;) {
 		switch (type) {
-		case OPTION_IP:	/* Works regardless of host byte order. */
-			dest += sprintf(dest, "%d.%d.%d.%d",
-					option[0], option[1],
-					option[2], option[3]);
- 			break;
 		case OPTION_IP_PAIR:
-			dest += sprintf(dest, "%d.%d.%d.%d, %d.%d.%d.%d",
-					option[0], option[1],
-					option[2], option[3],
-					option[4], option[5],
-					option[6], option[7]);
-			break;
+			dest += sprintip(dest, "", option);
+			*(dest++) = '/';
+			option += 4;
+			optlen = 4;
+		case OPTION_IP:	/* Works regardless of host byte order. */
+			dest += sprintip(dest, "", option);
+ 			break;
 		case OPTION_BOOLEAN:
-			dest += sprintf(dest, *option ? "yes" : "no");
+			dest += sprintf(dest, *option ? "yes " : "no ");
 			break;
 		case OPTION_U8:
-			dest += sprintf(dest, "%u", *option);
+			dest += sprintf(dest, "%u ", *option);
 			break;
 		case OPTION_U16:
 			memcpy(&val_u16, option, 2);
-			dest += sprintf(dest, "%u", ntohs(val_u16));
+			dest += sprintf(dest, "%u ", ntohs(val_u16));
 			break;
 		case OPTION_S16:
 			memcpy(&val_s16, option, 2);
-			dest += sprintf(dest, "%d", ntohs(val_s16));
+			dest += sprintf(dest, "%d ", ntohs(val_s16));
 			break;
 		case OPTION_U32:
 			memcpy(&val_u32, option, 4);
-			dest += sprintf(dest, "%lu", (unsigned long) ntohl(val_u32));
+			dest += sprintf(dest, "%lu ", (unsigned long) ntohl(val_u32));
 			break;
 		case OPTION_S32:
 			memcpy(&val_s32, option, 4);
-			dest += sprintf(dest, "%ld", (long) ntohl(val_s32));
+			dest += sprintf(dest, "%ld ", (long) ntohl(val_s32));
 			break;
 		case OPTION_STRING:
 			memcpy(dest, option, len);
@@ -132,7 +110,6 @@ static void fill_options(char *dest, unsigned char *option, struct dhcp_option *
 		option += optlen;
 		len -= optlen;
 		if (len <= 0) break;
-		*(dest++) = ' ';
 	}
 }
 
@@ -145,7 +122,7 @@ static char *find_env(const char *prefix, char *defaultstr)
 
 	for (ptr = environ; *ptr != NULL; ptr++) {
 		if (strncmp(prefix, *ptr, len) == 0)
-		return *ptr;
+			return *ptr;
 	}
 	return defaultstr;
 }
@@ -156,7 +133,6 @@ static char **fill_envp(struct dhcpMessage *packet)
 {
 	int num_options = 0;
 	int i, j;
-	unsigned char *addr;
 	char **envp, *temp;
 	char over = 0;
 
@@ -174,33 +150,28 @@ static char **fill_envp(struct dhcpMessage *packet)
 	}
 	
 	envp = malloc((num_options + 5) * sizeof(char *));
-	envp[0] = malloc(strlen("interface=") + strlen(client_config.interface) + 1);
+	envp[0] = malloc(sizeof("interface=") + strlen(client_config.interface));
 	sprintf(envp[0], "interface=%s", client_config.interface);
-	envp[1] = malloc(sizeof("ip=255.255.255.255"));
-	envp[2] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
-	envp[3] = find_env("HOME", "HOME=/");
+	envp[1] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
+	envp[2] = find_env("HOME", "HOME=/");
 
 	if (packet == NULL) {
-		envp[4] = NULL;
+		envp[3] = NULL;
 		return envp;
 	}
 
-	addr = (unsigned char *) &packet->yiaddr;
-	sprintf(envp[1], "ip=%d.%d.%d.%d",
-		addr[0], addr[1], addr[2], addr[3]);
+	envp[3] = malloc(sizeof("ip=255.255.255.255"));
+	sprintip(envp[3], "ip=", (unsigned char *) &packet->yiaddr);
 	for (i = 0, j = 4; options[i].code; i++) {
 		if ((temp = get_option(packet, options[i].code))) {
-			envp[j] = malloc(max_option_length(temp, &options[i]) + 
-					strlen(options[i].name) + 2);
+			envp[j] = malloc(max_option_length[options[i].flags & TYPE_MASK] + strlen(options[i].name) + 2);
 			fill_options(envp[j], temp, &options[i]);
 			j++;
 		}
 	}
 	if (packet->siaddr) {
 		envp[j] = malloc(sizeof("siaddr=255.255.255.255"));
-		addr = (unsigned char *) &packet->yiaddr;
-		sprintf(envp[j++], "siaddr=%d.%d.%d.%d",
-			addr[0], addr[1], addr[2], addr[3]);
+		sprintip(envp[j++], "siaddr=", (unsigned char *) &packet->yiaddr);
 	}
 	if (!(over & FILE_FIELD) && packet->file[0]) {
 		/* watch out for invalid packets */
@@ -243,7 +214,7 @@ void run_script(struct dhcpMessage *packet, const char *name)
 		execle(client_config.script, client_config.script,
 		       name, NULL, envp);
 		LOG(LOG_ERR, "script %s failed: %s",
-		    client_config.script, strerror(errno));
+		    client_config.script, sys_errlist[errno]);
 		exit(1);
 	}			
 }

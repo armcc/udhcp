@@ -19,12 +19,25 @@
 #include "dhcpd.h"
 #include "options.h"
 
+
+void init_header(struct dhcpMessage *packet, char type)
+{
+	memset(packet, 0, sizeof(struct dhcpMessage));
+	packet->op = BOOTREQUEST;
+	packet->htype = ETH_10MB;
+	packet->hlen = ETH_10MB_LEN;
+	packet->cookie = htonl(DHCP_MAGIC);
+	packet->options[0] = DHCP_END;
+	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
+}
+
+
 /* read a packet from socket fd */
 int get_packet(struct dhcpMessage *packet, int fd)
 {
 	int bytes;
 	int i;
-	char broken_vendors[][8] = {
+	const char broken_vendors[][8] = {
 		"MSFT 98",
 		""
 	};
@@ -33,21 +46,20 @@ int get_packet(struct dhcpMessage *packet, int fd)
 	memset(packet, 0, sizeof(struct dhcpMessage));
 	bytes = read(fd, packet, sizeof(struct dhcpMessage));
 	if (bytes < 0) {
-		DEBUG(LOG_INFO, "couldn't read on listening socket -- ignoring");
+		DEBUG(LOG_INFO, "couldn't read on listening socket, ignoring");
 		return -1;
 	}
 
 	if (ntohl(packet->cookie) != DHCP_MAGIC) {
-		LOG(LOG_ERR, "received bogus message -- ignoring");
+		LOG(LOG_ERR, "received bogus message, ignoring");
 		return -1;
 	}
-	DEBUG(LOG_INFO, "oooooh!!! got some!");
+	DEBUG(LOG_INFO, "Received a packet");
 	
 	if (packet->op == BOOTREQUEST && (vendor = get_option(packet, DHCP_VENDOR))) {
 		for (i = 0; broken_vendors[i][0]; i++) {
 			if (vendor[OPT_LEN - 2] == (signed) strlen(broken_vendors[i]) &&
-			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2]) &&
-			    !(ntohs(packet->flags) & BROADCAST_FLAG)) {
+			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2])) {
 			    	DEBUG(LOG_INFO, "broken client (%s), forcing broadcast",
 			    		broken_vendors[i]);
 			    	packet->flags |= htons(BROADCAST_FLAG);
@@ -57,24 +69,6 @@ int get_packet(struct dhcpMessage *packet, int fd)
 			    	
 
 	return bytes;
-}
-
-
-/* Calculate the length of a packet, and make sure its a multiple of 2 */
-static int calc_length(struct dhcpMessage *payload)
-{
-	int payload_length;
-	
-	payload_length = sizeof(struct dhcpMessage) - 308;
-	payload_length += end_option(payload->options) + 1;
-	if (payload_length % 2) {
-		payload_length++;
-		*((char *) payload + payload_length - 1) = '\0';
-	}
-
-	DEBUG(LOG_INFO, "payload length is %d bytes", payload_length);
-	
-	return payload_length;
 }
 
 
@@ -109,7 +103,7 @@ int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port
 		   u_int32_t dest_ip, int dest_port, char *dest_arp, int ifindex)
 {
 	int fd;
-	int result, payload_length = calc_length(payload);
+	int result;
 	struct sockaddr_ll dest;
 	struct udp_dhcp_packet packet;
 
@@ -135,20 +129,20 @@ int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port
 	packet.ip.protocol = IPPROTO_UDP;
 	packet.ip.saddr = source_ip;
 	packet.ip.daddr = dest_ip;
-	packet.ip.tot_len = htons(sizeof(packet.udp) + payload_length); /* cheat on the psuedo-header */
 	packet.udp.source = htons(source_port);
 	packet.udp.dest = htons(dest_port);
-	packet.udp.len = htons(sizeof(packet.udp) + payload_length);
-	memcpy(&(packet.data), payload, payload_length);
-	packet.udp.check = checksum(&packet, sizeof(packet.ip) + sizeof(packet.udp) + payload_length);
+	packet.udp.len = htons(sizeof(packet.udp) + sizeof(struct dhcpMessage)); /* cheat on the psuedo-header */
+	packet.ip.tot_len = packet.udp.len;
+	memcpy(&(packet.data), payload, sizeof(struct dhcpMessage));
+	packet.udp.check = checksum(&packet, sizeof(struct udp_dhcp_packet));
 	
-	packet.ip.tot_len = htons(sizeof(packet.ip) + sizeof(packet.udp) + payload_length);
+	packet.ip.tot_len = htons(sizeof(struct udp_dhcp_packet));
 	packet.ip.ihl = sizeof(packet.ip) >> 2;
 	packet.ip.version = IPVERSION;
 	packet.ip.ttl = IPDEFTTL;
 	packet.ip.check = checksum(&(packet.ip), sizeof(packet.ip));
 
-	result = sendto(fd, &packet, ntohs(packet.ip.tot_len), 0, (struct sockaddr *) &dest, sizeof(dest));
+	result = sendto(fd, &packet, sizeof(struct udp_dhcp_packet), 0, (struct sockaddr *) &dest, sizeof(dest));
 	if (result <= 0) {
 		DEBUG(LOG_ERR, "write on socket failed: %s", sys_errlist[errno]);
 	}
@@ -162,7 +156,7 @@ int kernel_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_p
 		   u_int32_t dest_ip, int dest_port)
 {
 	int n = 1;
-	int fd, result, payload_length = calc_length(payload);
+	int fd, result;
 	struct sockaddr_in client;
 	
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -187,7 +181,7 @@ int kernel_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_p
 	if (connect(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1)
 		return -1;
 
-	result = write(fd, payload, payload_length);
+	result = write(fd, payload, sizeof(struct dhcpMessage));
 	close(fd);
 	return result;
 }	

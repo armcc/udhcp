@@ -29,6 +29,7 @@ struct udp_dhcp_packet {
 	struct dhcpMessage data;
 };
 
+void init_header(struct dhcpMessage *packet, char type);
 int get_packet(struct dhcpMessage *packet, int fd);
 u_int16_t checksum(void *addr, int count);
 int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port,

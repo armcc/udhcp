@@ -55,12 +55,14 @@ CFLAGS += -W -Wall -Wstrict-prototypes -DVERSION='"$(VER)"'
 
 ifdef DEBUG
 CFLAGS += -g -DDEBUG
+STRIP=true
 else
 CFLAGS += -Os -fomit-frame-pointer
-STRIP=-s
+STRIP=$(CROSS_COMPILE)strip
 endif
 
 all: $(EXEC1) $(EXEC2) $(EXEC3)
+	$(STRIP) --remove-section=.note --remove-section=.comment $(EXEC1) $(EXEC2) $(EXEC3)
 
 $(OBJS1) $(OBJS2) $(OBJS3): *.h Makefile
 $(EXEC1) $(EXEC2) $(EXEC3): Makefile
@@ -80,12 +82,12 @@ $(EXEC3): $(OBJS3)
 
 install: all
 
-	$(INSTALL) $(STRIP) $(DAEMONS) $(USRSBINDIR)
-	$(INSTALL) $(STRIP) $(COMMANDS) $(USRBINDIR)
+	$(INSTALL) $(DAEMONS) $(USRSBINDIR)
+	$(INSTALL) $(COMMANDS) $(USRBINDIR)
 ifdef COMBINED_BINARY
 	ln -sf $(USRSBINDIR)/$(DAEMONS) $(SBINDIR)/$(BOOT_PROGRAMS)
 else
-	$(INSTALL) $(STRIP) $(BOOT_PROGRAMS) $(SBINDIR)
+	$(INSTALL) $(BOOT_PROGRAMS) $(SBINDIR)
 endif
 	mkdir -p $(USRSHAREDIR)/udhcpc
 	for name in bound deconfig renew script ; do \

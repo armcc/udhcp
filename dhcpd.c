@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 {	
 	fd_set rfds;
 	struct timeval tv;
-	int server_socket;
+	int server_socket = -1;
 	int bytes, retval;
 	struct dhcpMessage packet;
 	unsigned char *state;
@@ -142,9 +142,9 @@ int main(int argc, char *argv[])
 	timeout_end = time(0) + server_config.auto_time;
 	while(1) { /* loop until universe collapses */
 
-		server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface);
-		if(server_socket == -1) {
-			LOG(LOG_ERR, "couldn't create server socket -- au revoir");
+		close(server_socket);
+		if ((server_socket = listen_socket(INADDR_ANY, SERVER_PORT, server_config.interface)) < 0) {
+			LOG(LOG_ERR, "FATAL: couldn't create server socket");
 			exit_server(0);
 		}			
 
@@ -160,24 +160,21 @@ int main(int argc, char *argv[])
 			tv.tv_usec = 0;
 		}
 		retval = select(server_socket + 1, &rfds, NULL, NULL, server_config.auto_time ? &tv : NULL);
+
 		if (retval == 0) {
 			write_leases(0);
 			timeout_end = time(0) + server_config.auto_time;
-			close(server_socket);
 			continue;
 		} else if (retval < 0) {
 			DEBUG(LOG_INFO, "error on select");
-			close(server_socket);
 			continue;
 		}
 		
-		bytes = get_packet(&packet, server_socket); /* this waits for a packet - idle */
-		close(server_socket);
-		if(bytes < 0)
+		if ((bytes = get_packet(&packet, server_socket)) < 0) /* this waits for a packet - idle */
 			continue;
 
-		if((state = get_option(&packet, DHCP_MESSAGE_TYPE)) == NULL) {
-			DEBUG(LOG_ERR, "couldnt get option from packet -- ignoring");
+		if ((state = get_option(&packet, DHCP_MESSAGE_TYPE)) == NULL) {
+			DEBUG(LOG_ERR, "couldn't get option from packet, ignoring");
 			continue;
 		}
 		
@@ -187,11 +184,11 @@ int main(int argc, char *argv[])
 			DEBUG(LOG_INFO,"received DISCOVER");
 			
 			if (sendOffer(&packet) < 0) {
-				LOG(LOG_ERR, "send OFFER failed -- ignoring");
+				LOG(LOG_ERR, "send OFFER failed");
 			}
 			break;			
  		case DHCPREQUEST:
-			DEBUG(LOG_INFO,"received REQUEST");
+			DEBUG(LOG_INFO, "received REQUEST");
 
 			requested = get_option(&packet, DHCP_REQUESTED_IP);
 			server_id = get_option(&packet, DHCP_SERVER_ID);

@@ -63,7 +63,6 @@ int option_lengths[] = {
 unsigned char *get_option(struct dhcpMessage *packet, int code)
 {
 	int i, length;
-	static char err[] = "bogus packet, option fields too long."; /* save a few bytes */
 	unsigned char *optionptr;
 	int over = 0, done = 0, curr = OPTION_FIELD;
 	
@@ -72,12 +71,12 @@ unsigned char *get_option(struct dhcpMessage *packet, int code)
 	length = 308;
 	while (!done) {
 		if (i >= length) {
-			LOG(LOG_WARNING, err);
+			LOG(LOG_WARNING, "bogus packet, option fields too long.");
 			return NULL;
 		}
 		if (optionptr[i + OPT_CODE] == code) {
 			if (i + 1 + optionptr[i + OPT_LEN] >= length) {
-				LOG(LOG_WARNING, err);
+				LOG(LOG_WARNING, "bogus packet, option fields too long.");
 				return NULL;
 			}
 			return optionptr + i + 2;
@@ -88,7 +87,7 @@ unsigned char *get_option(struct dhcpMessage *packet, int code)
 			break;
 		case DHCP_OPTION_OVER:
 			if (i + 1 + optionptr[i + OPT_LEN] >= length) {
-				LOG(LOG_WARNING, err);
+				LOG(LOG_WARNING, "bogus packet, option fields too long.");
 				return NULL;
 			}
 			over = optionptr[i + 3];
@@ -132,13 +131,11 @@ int end_option(unsigned char *optionptr)
  * length, then data) */
 int add_option_string(unsigned char *optionptr, unsigned char *string)
 {
-	int i, end = end_option(optionptr);
+	int end = end_option(optionptr);
 	
 	/* end position + string length + option code/length + end option */
 	if (end + string[OPT_LEN] + 2 + 1 >= 308) {
-		for (i = 0; options[i].code && options[i].code != string[OPT_CODE]; i++);
-		LOG(LOG_ERR, "Option %s (0x%02x) did not fit into the packet!", 
-			options[i].code ? options[i].name : "unknown", string[OPT_CODE]);
+		LOG(LOG_ERR, "Option 0x%02x did not fit into the packet!", string[OPT_CODE]);
 		return 0;
 	}
 	DEBUG(LOG_INFO, "adding option 0x%02x", string[OPT_CODE]);
@@ -152,13 +149,12 @@ int add_option_string(unsigned char *optionptr, unsigned char *string)
 int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t data)
 {
 	char length = 0;
-	int i, end;
-	char buffer[4]; /* Cant copy straight to optionptr, it might not be aligned */
+	int i;
+	char option[2 + 4];
 
 	for (i = 0; options[i].code; i++)
 		if (options[i].code == code) {
 			length = option_lengths[options[i].flags & TYPE_MASK];
-			break;
 		}
 		
 	if (!length) {
@@ -166,19 +162,15 @@ int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t da
 		return 0;
 	}
 	
-	DEBUG(LOG_INFO, "adding option 0x%02x", code);
-	end = end_option(optionptr);
-	optionptr[end + OPT_CODE] = code;
-	optionptr[end + OPT_LEN] = length;
+	option[OPT_CODE] = code;
+	option[OPT_LEN] = length;
 
 	switch (length) {
-		case 1: buffer[0] = (char) data; break;
-		case 2: *((u_int16_t *) buffer) = htons(data); break;
-		case 4: *((u_int32_t *) buffer) = htonl(data); break;
+		case 1: option[2] = (char) data; break;
+		case 2: *((u_int16_t *) (option + 2)) = data; break;
+		case 4: *((u_int32_t *) (option + 2)) = data; break;
 	}
-	memcpy(&optionptr[end + 2], buffer, length);
-	optionptr[end + length + 2] = DHCP_END;
-	return length;
+	return add_option_string(optionptr, option);
 }
 
 

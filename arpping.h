@@ -12,7 +12,6 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-
 struct arpMsg {
 	struct ethhdr ethhdr;	 		/* Ethernet header */
 	u_short htype;				/* hardware type (must be ARPHRD_ETHER) */
@@ -26,16 +25,6 @@ struct arpMsg {
 	u_char  tInaddr[4];			/* target's IP address */
 	u_char  pad[18];			/* pad for min. Ethernet payload (60 bytes) */
 };
-
-struct ifinfo {
-    char ifname[IFNAMSIZ];
-    u_long addr;		/* network byte order */
-    u_long mask;		/* network byte order */
-    u_long bcast;		/* network byte order */
-    u_char haddr[6];
-    short flags;
-};
-
 
 /* function prototypes */
 int arpping(u_int32_t yiaddr, u_int32_t ip, char *arp, char *interface);

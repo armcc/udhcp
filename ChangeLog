@@ -5,6 +5,8 @@
 + Accept packets with extra garbage (me)
 + Better error handling in files.c (me)
 + Combined read_interface function to reduce COMBINED_BINARY size (me)
++ Drop calc_length(), some servers choke on smaller packets (me)
++ Try to clean some fat out (me)
 
 0.9.6 (011001)
 + Added bootp paramaters to server (me)

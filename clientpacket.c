@@ -64,15 +64,8 @@ static void init_packet(struct dhcpMessage *packet, char type)
 		char str[sizeof("udhcp "VERSION)];
 	} vendor_id = { DHCP_VENDOR,  sizeof("udhcp "VERSION) - 1, "udhcp "VERSION};
 	
-	memset(packet, 0, sizeof(struct dhcpMessage));
-	
-	packet->op = BOOTREQUEST;
-	packet->htype = ETH_10MB;
-	packet->hlen = ETH_10MB_LEN;
-	packet->cookie = htonl(DHCP_MAGIC);
-	packet->options[0] = DHCP_END;
+	init_header(packet, type);
 	memcpy(packet->chaddr, client_config.arp, 6);
-	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
 	if (client_config.clientid) add_option_string(packet->options, client_config.clientid);
 	if (client_config.hostname) add_option_string(packet->options, client_config.hostname);
 	add_option_string(packet->options, (char *) &vendor_id);
@@ -97,7 +90,7 @@ int send_discover(unsigned long xid, unsigned long requested)
 	init_packet(&packet, DHCPDISCOVER);
 	packet.xid = xid;
 	if (requested)
-		add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(requested));
+		add_simple_option(packet.options, DHCP_REQUESTED_IP, requested);
 
 	add_requests(&packet);
 	LOG(LOG_DEBUG, "Sending discover...");
@@ -115,11 +108,8 @@ int send_selecting(unsigned long xid, unsigned long server, unsigned long reques
 	init_packet(&packet, DHCPREQUEST);
 	packet.xid = xid;
 
-	/* expects host order */
-	add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(requested));
-
-	/* expects host order */
-	add_simple_option(packet.options, DHCP_SERVER_ID, ntohl(server));
+	add_simple_option(packet.options, DHCP_REQUESTED_IP, requested);
+	add_simple_option(packet.options, DHCP_SERVER_ID, server);
 	
 	add_requests(&packet);
 	addr.s_addr = requested;
@@ -157,9 +147,8 @@ int send_release(unsigned long server, unsigned long ciaddr)
 	packet.xid = random_xid();
 	packet.ciaddr = ciaddr;
 	
-	/* expects host order */
-	add_simple_option(packet.options, DHCP_REQUESTED_IP, ntohl(ciaddr));
-	add_simple_option(packet.options, DHCP_SERVER_ID, ntohl(server));
+	add_simple_option(packet.options, DHCP_REQUESTED_IP, ciaddr);
+	add_simple_option(packet.options, DHCP_SERVER_ID, server);
 
 	LOG(LOG_DEBUG, "Sending release...");
 	return kernel_packet(&packet, ciaddr, CLIENT_PORT, server, SERVER_PORT);

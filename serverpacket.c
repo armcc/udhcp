@@ -44,25 +44,25 @@ static int send_packet_to_relay(struct dhcpMessage *payload)
 /* send a packet to a specific arp address and ip address by creating our own ip packet */
 static int send_packet_to_client(struct dhcpMessage *payload, int force_broadcast)
 {
+	char *chaddr;
 	u_int32_t ciaddr;
-	char chaddr[6];
 	
 	if (force_broadcast) {
 		DEBUG(LOG_INFO, "broadcasting packet to client (NAK)");
 		ciaddr = INADDR_BROADCAST;
-		memcpy(chaddr, MAC_BCAST_ADDR, 6);		
+		chaddr = MAC_BCAST_ADDR;
 	} else if (payload->ciaddr) {
 		DEBUG(LOG_INFO, "unicasting packet to client ciaddr");
 		ciaddr = payload->ciaddr;
-		memcpy(chaddr, payload->chaddr, 6);
+		chaddr = payload->chaddr;
 	} else if (ntohs(payload->flags) & BROADCAST_FLAG) {
 		DEBUG(LOG_INFO, "broadcasting packet to client (requested)");
 		ciaddr = INADDR_BROADCAST;
-		memcpy(chaddr, MAC_BCAST_ADDR, 6);		
+		chaddr = MAC_BCAST_ADDR;
 	} else {
 		DEBUG(LOG_INFO, "unicasting packet to client yiaddr");
 		ciaddr = payload->yiaddr;
-		memcpy(chaddr, payload->chaddr, 6);
+		chaddr = payload->chaddr;
 	}
 	return raw_packet(payload, server_config.server, SERVER_PORT, 
 			ciaddr, CLIENT_PORT, chaddr, server_config.ifindex);
@@ -83,20 +83,13 @@ static int send_packet(struct dhcpMessage *payload, int force_broadcast)
 
 static void init_packet(struct dhcpMessage *packet, struct dhcpMessage *oldpacket, char type)
 {
-	memset(packet, 0, sizeof(struct dhcpMessage));
-	
-	packet->op = BOOTREPLY;
-	packet->htype = ETH_10MB;
-	packet->hlen = ETH_10MB_LEN;
+	init_header(packet, type);
 	packet->xid = oldpacket->xid;
 	memcpy(packet->chaddr, oldpacket->chaddr, 16);
-	packet->cookie = htonl(DHCP_MAGIC);
-	packet->options[0] = DHCP_END;
 	packet->flags = oldpacket->flags;
 	packet->giaddr = oldpacket->giaddr;
 	packet->ciaddr = oldpacket->ciaddr;
-	add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
-	add_simple_option(packet->options, DHCP_SERVER_ID, ntohl(server_config.server)); /* expects host order */
+	add_simple_option(packet->options, DHCP_SERVER_ID, server_config.server);
 }
 
 
@@ -175,7 +168,7 @@ int sendOffer(struct dhcpMessage *oldpacket)
 	if (lease_time_align < server_config.min_lease) 
 		lease_time_align = server_config.lease;
 		
-	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time_align);
+	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_align));
 
 	curr = server_config.options;
 	while (curr) {
@@ -223,7 +216,7 @@ int sendACK(struct dhcpMessage *oldpacket, u_int32_t yiaddr)
 			lease_time_align = server_config.lease;
 	}
 	
-	add_simple_option(packet.options, DHCP_LEASE_TIME, lease_time_align);
+	add_simple_option(packet.options, DHCP_LEASE_TIME, htonl(lease_time_align));
 	
 	curr = server_config.options;
 	while (curr) {

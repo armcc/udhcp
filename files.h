@@ -3,10 +3,10 @@
 #define _FILES_H
 
 struct config_keyword {
-	char keyword[20];
+	char keyword[14];
 	int (*handler)(char *line, void *var);
 	void *var;
-	char def[40];
+	char def[20];
 };
 
 
