@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "debug.h"
 #include "dhcpd.h"
