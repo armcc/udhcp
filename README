@@ -101,6 +101,7 @@ The paramaters for the config file and enviromental variables are as follows:
 	domain		- The domain name of the network
 	swapsvr		- The IP address of the client's swap server
 	rootpath	- The path name of the client's root disk
+	ipttl		- The TTL to use for this network
 	mtu		- The MTU to use for this network
 	broadcast	- The broadcast address for this network
 	ntpsrv		- A list of NTP servers

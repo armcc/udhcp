@@ -30,6 +30,7 @@ struct dhcp_option options[] = {
 	{"domain",	OPTION_STRING,			0x0f},
 	{"swapsvr",	OPTION_IP,			0x10},
 	{"rootpath",	OPTION_STRING,			0x11},
+	{"ipttl",	OPTION_U8,			0x17},
 	{"mtu",		OPTION_U16,			0x1a},
 	{"broadcast",	OPTION_IP,			0x1c},
 	{"ntpsrv",	OPTION_IP | OPTION_LIST,	0x2a},
