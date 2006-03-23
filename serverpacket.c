@@ -25,10 +25,10 @@
 #include <string.h>
 #include <time.h>
 
+#include "common.h"
 #include "serverpacket.h"
 #include "dhcpd.h"
 #include "options.h"
-#include "common.h"
 #include "static_leases.h"
 
 /* send a packet to giaddr using the kernel ip stack */
@@ -98,9 +98,9 @@ static void add_bootp_options(struct dhcpMessage *packet)
 {
 	packet->siaddr = server_config.siaddr;
 	if (server_config.sname)
-		strncpy(packet->sname, server_config.sname, sizeof(packet->sname) - 1);
+		strncpy((char*)packet->sname, server_config.sname, sizeof(packet->sname) - 1);
 	if (server_config.boot_file)
-		strncpy(packet->file, server_config.boot_file, sizeof(packet->file) - 1);
+		strncpy((char*)packet->file, server_config.boot_file, sizeof(packet->file) - 1);
 }
 
 
@@ -138,11 +138,11 @@ int sendOffer(struct dhcpMessage *oldpacket)
 		   /* and the ip is in the lease range */
 		   ntohl(req_align) >= ntohl(server_config.start) &&
 		   ntohl(req_align) <= ntohl(server_config.end) &&
-		
+
 			!static_lease_ip &&  /* Check that its not a static lease */
 			/* and is not already taken/offered */
 		   ((!(lease = find_lease_by_yiaddr(req_align)) ||
-		
+
 		   /* or its taken, but expired */ /* ADDME: or maybe in here */
 		   lease_expired(lease)))) {
 				packet.yiaddr = req_align; /* FIXME: oh my, is there a host using this IP? */

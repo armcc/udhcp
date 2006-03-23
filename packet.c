@@ -46,12 +46,12 @@ void init_header(struct dhcpMessage *packet, char type)
 /* read a packet from socket fd, return -1 on read error, -2 on packet error */
 int get_packet(struct dhcpMessage *packet, int fd)
 {
-	int bytes;
-	int i;
-	const char broken_vendors[][8] = {
+	static const char broken_vendors[][8] = {
 		"MSFT 98",
 		""
 	};
+	int bytes;
+	int i;
 	char unsigned *vendor;
 
 	memset(packet, 0, sizeof(struct dhcpMessage));
@@ -70,14 +70,13 @@ int get_packet(struct dhcpMessage *packet, int fd)
 	if (packet->op == BOOTREQUEST && (vendor = get_option(packet, DHCP_VENDOR))) {
 		for (i = 0; broken_vendors[i][0]; i++) {
 			if (vendor[OPT_LEN - 2] == (uint8_t) strlen(broken_vendors[i]) &&
-			    !strncmp(vendor, broken_vendors[i], vendor[OPT_LEN - 2])) {
-			    	DEBUG(LOG_INFO, "broken client (%s), forcing broadcast",
-			    		broken_vendors[i]);
-			    	packet->flags |= htons(BROADCAST_FLAG);
+			    !strncmp((char*)vendor, broken_vendors[i], vendor[OPT_LEN - 2])) {
+				DEBUG(LOG_INFO, "broken client (%s), forcing broadcast",
+					broken_vendors[i]);
+				packet->flags |= htons(BROADCAST_FLAG);
 			}
 		}
 	}
-			
 
 	return bytes;
 }
@@ -177,24 +176,30 @@ int kernel_packet(struct dhcpMessage *payload, uint32_t source_ip, int source_po
 	if ((fd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		return -1;
 
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *) &n, sizeof(n)) == -1)
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *) &n, sizeof(n)) == -1) {
+		close(fd);
 		return -1;
+	}
 
 	memset(&client, 0, sizeof(client));
 	client.sin_family = AF_INET;
 	client.sin_port = htons(source_port);
 	client.sin_addr.s_addr = source_ip;
 
-	if (bind(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1)
+	if (bind(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1) {
+		close(fd);
 		return -1;
+	}
 
 	memset(&client, 0, sizeof(client));
 	client.sin_family = AF_INET;
 	client.sin_port = htons(dest_port);
 	client.sin_addr.s_addr = dest_ip;
 
-	if (connect(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1)
+	if (connect(fd, (struct sockaddr *)&client, sizeof(struct sockaddr)) == -1) {
+		close(fd);
 		return -1;
+	}
 
 	result = write(fd, payload, sizeof(struct dhcpMessage));
 	close(fd);

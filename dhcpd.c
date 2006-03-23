@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 	else server_config.lease = LEASE_TIME;
 
 	/* Sanity check */
-	num_ips = ntohl(server_config.end) - ntohl(server_config.start);
+	num_ips = ntohl(server_config.end) - ntohl(server_config.start) + 1;
 	if (server_config.max_leases > num_ips) {
 		LOG(LOG_ERR, "max_leases value (%lu) not sane, "
 			"setting to %lu instead",
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
 				LOG(LOG_ERR, "send OFFER failed");
 			}
 			break;
- 		case DHCPREQUEST:
+		case DHCPREQUEST:
 			DEBUG(LOG_INFO, "received REQUEST");
 
 			requested = get_option(&packet, DHCP_REQUESTED_IP);

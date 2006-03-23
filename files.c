@@ -15,8 +15,8 @@
 #include "static_leases.h"
 
 #include "dhcpd.h"
-#include "files.h"
 #include "options.h"
+#include "files.h"
 #include "common.h"
 
 /*
@@ -62,7 +62,7 @@ static int read_str(const char *line, void *arg)
 {
 	char **dest = arg;
 
-	if (*dest) free(*dest);
+	free(*dest);
 	*dest = strdup(line);
 
 	return 1;
@@ -90,6 +90,53 @@ static int read_yn(const char *line, void *arg)
 	else retval = 0;
 
 	return retval;
+}
+
+
+/* find option 'code' in opt_list */
+struct option_set *find_option(struct option_set *opt_list, char code)
+{
+	while (opt_list && opt_list->data[OPT_CODE] < code)
+		opt_list = opt_list->next;
+
+	if (opt_list && opt_list->data[OPT_CODE] == code) return opt_list;
+	else return NULL;
+}
+
+
+/* add an option to the opt_list */
+static void attach_option(struct option_set **opt_list, struct dhcp_option *option, char *buffer, int length)
+{
+	struct option_set *existing, *new, **curr;
+
+	/* add it to an existing option */
+	if ((existing = find_option(*opt_list, option->code))) {
+		DEBUG(LOG_INFO, "Attaching option %s to existing member of list", option->name);
+		if (option->flags & OPTION_LIST) {
+			if (existing->data[OPT_LEN] + length <= 255) {
+				existing->data = realloc(existing->data,
+						existing->data[OPT_LEN] + length + 2);
+				memcpy(existing->data + existing->data[OPT_LEN] + 2, buffer, length);
+				existing->data[OPT_LEN] += length;
+			} /* else, ignore the data, we could put this in a second option in the future */
+		} /* else, ignore the new data */
+	} else {
+		DEBUG(LOG_INFO, "Attaching option %s to list", option->name);
+
+		/* make a new option */
+		new = xmalloc(sizeof(struct option_set));
+		new->data = xmalloc(length + 2);
+		new->data[OPT_CODE] = option->code;
+		new->data[OPT_LEN] = length;
+		memcpy(new->data + 2, buffer, length);
+
+		curr = opt_list;
+		while (*curr && (*curr)->data[OPT_CODE] < option->code)
+			curr = &(*curr)->next;
+
+		new->next = *curr;
+		*curr = new;
+	}
 }
 
 
@@ -225,7 +272,7 @@ static const struct config_keyword keywords[] = {
 	{"boot_file",	read_str, &(server_config.boot_file),	""},
 	{"static_lease",read_staticlease, &(server_config.static_leases),	""},
 	/*ADDME: static lease */
-	{"",		NULL, 	  NULL,				""}
+	{"",		NULL,	  NULL,				""}
 };
 
 

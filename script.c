@@ -29,10 +29,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include "common.h"
 #include "options.h"
 #include "dhcpd.h"
 #include "dhcpc.h"
-#include "common.h"
+#include "script.h"
 
 /* get a rough idea of how long an option will be (rounding up...) */
 static const int max_option_length[] = {
@@ -96,7 +97,7 @@ static void fill_options(char *dest, uint8_t *option, struct dhcp_option *type_p
 			optlen = 4;
 		case OPTION_IP:	/* Works regardless of host byte order. */
 			dest += sprintip(dest, "", option);
- 			break;
+			break;
 		case OPTION_BOOLEAN:
 			dest += sprintf(dest, *option ? "yes" : "no");
 			break;
