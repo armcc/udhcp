@@ -100,4 +100,4 @@ endif
 	$(INSTALL) -m 644 udhcpc.8 udhcpd.8 $(USRSHAREDIR)/man/man8
 
 clean:
-	-rm -f udhcpd udhcpc dumpleases *.o core
+	-rm -f udhcpd udhcpc dumpleases *.o *.a core
