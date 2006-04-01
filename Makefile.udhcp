@@ -3,21 +3,28 @@
 DESTDIR     = 
 prefix      = /usr
 SBINDIR     = /sbin
-USRSBINDIR  = $(DESTDIR)${prefix}/sbin
-USRBINDIR   = $(DESTDIR)${prefix}/bin
-USRSHAREDIR = $(DESTDIR)${prefix}/share
+USRSBINDIR  = $(DESTDIR)$(prefix)/sbin
+USRBINDIR   = $(DESTDIR)$(prefix)/bin
+USRSHAREDIR = $(DESTDIR)$(prefix)/share
 
 # Uncomment this to get a shared binary. Call as udhcpd for the server,
 # and udhcpc for the client
-COMBINED_BINARY=1
+#COMBINED_BINARY=1
 
 # Uncomment this for extra output and to compile with debugging symbols
 #UDHCP_DEBUG=1
 
 # Uncomment this to output messages to syslog, otherwise, messages go to stdout
-#CFLAGS += -DUDHCP_SYSLOG
+#UDHCP_SYSLOG=1
 
+# Set to the prefix of your cross-compiler
 #CROSS_COMPILE=arm-uclibc-
+
+
+#---------------------------------------------------#
+# You should not have to change anything below here #
+#---------------------------------------------------#
+
 CC = $(CROSS_COMPILE)gcc
 LD = $(CROSS_COMPILE)gcc
 INSTALL = install
@@ -69,13 +76,13 @@ $(EXEC1) $(EXEC2) $(EXEC3): Makefile
 	$(CC) -c $(CFLAGS) $<
 	
 $(EXEC1): $(OBJS1)
-	$(LD) $(LDFLAGS) $(OBJS1) -o $(EXEC1)
+	$(LD) $(CFLAGS) $(LDFLAGS) $(OBJS1) -o $(EXEC1)
 
 $(EXEC2): $(OBJS2)
-	$(LD) $(LDFLAGS) $(OBJS2) -o $(EXEC2)
+	$(LD) $(CFLAGS) $(LDFLAGS) $(OBJS2) -o $(EXEC2)
 
 $(EXEC3): $(OBJS3)
-	$(LD) $(LDFLAGS) $(OBJS3) -o $(EXEC3)
+	$(LD) $(CFLAGS) $(LDFLAGS) $(OBJS3) -o $(EXEC3)
 
 
 install: all
