@@ -79,6 +79,7 @@ void background(const char *pidfile)
 
 
 #ifdef UDHCP_SYSLOG
+
 void udhcp_logging(int level, const char *fmt, ...)
 {
 	va_list p;
@@ -93,26 +94,6 @@ void udhcp_logging(int level, const char *fmt, ...)
 	vsyslog(level, fmt, p2);
 	va_end(p);
 }
-
-
-void start_log_and_pid(const char *client_server, const char *pidfile)
-{
-	int pid_fd;
-
-	/* Make sure our syslog fd isn't overwritten */
-	sanitize_fds();
-
-	/* do some other misc startup stuff while we are here to save bytes */
-	pid_fd = pidfile_acquire(pidfile);
-	pidfile_write_release(pid_fd);
-
-	/* equivelent of doing a fflush after every \n */
-	setlinebuf(stdout);
-
-	openlog(client_server, LOG_PID | LOG_CONS, LOG_LOCAL0);
-	udhcp_logging(LOG_INFO, "%s (v%s) started", client_server, VERSION);
-}
-
 
 #else
 
@@ -140,6 +121,7 @@ void udhcp_logging(int level, const char *fmt, ...)
 	}
 	va_end(p);
 }
+#endif
 
 
 void start_log_and_pid(const char *client_server, const char *pidfile)
@@ -156,7 +138,9 @@ void start_log_and_pid(const char *client_server, const char *pidfile)
 	/* equivelent of doing a fflush after every \n */
 	setlinebuf(stdout);
 
-	udhcp_logging(LOG_INFO, "%s (v%s) started", client_server, VERSION);
-}
+#ifdef UDHCP_SYSLOG
+	openlog(client_server, LOG_PID | LOG_CONS, LOG_LOCAL0);
 #endif
 
+	udhcp_logging(LOG_INFO, "%s (v%s) started", client_server, VERSION);
+}
