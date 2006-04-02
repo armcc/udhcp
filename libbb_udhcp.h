@@ -1,4 +1,4 @@
-/* libbb_udhcp.h - busybox compatability wrapper */
+/* libbb_udhcp.h - busybox compatibility wrapper */
 
 /* bit of a hack, do this no matter what the order of the includes.
  * (for busybox) */
