@@ -20,6 +20,7 @@
  */
 
 #include <unistd.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -43,6 +44,8 @@ static void signal_handler(int sig)
 void udhcp_sp_setup(void)
 {
 	socketpair(AF_UNIX, SOCK_STREAM, 0, signal_pipe);
+	fcntl(signal_pipe[0], F_SETFD, FD_CLOEXEC);
+	fcntl(signal_pipe[1], F_SETFD, FD_CLOEXEC);
 	signal(SIGUSR1, signal_handler);
 	signal(SIGUSR2, signal_handler);
 	signal(SIGTERM, signal_handler);
@@ -56,7 +59,10 @@ int udhcp_sp_fd_set(fd_set *rfds, int extra_fd)
 {
 	FD_ZERO(rfds);
 	FD_SET(signal_pipe[0], rfds);
-	if (extra_fd >= 0) FD_SET(extra_fd, rfds);
+	if (extra_fd >= 0) {
+		fcntl(extra_fd, F_SETFD, FD_CLOEXEC);
+		FD_SET(extra_fd, rfds);
+	}
 	return signal_pipe[0] > extra_fd ? signal_pipe[0] : extra_fd;
 }
 
