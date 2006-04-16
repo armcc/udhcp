@@ -90,7 +90,7 @@ int arpping(uint32_t yiaddr, uint32_t ip, uint8_t *mac, char *interface)
 		} else if (FD_ISSET(s, &fdset)) {
 			if (recv(s, &arp, sizeof(arp), 0) < 0 ) rv = 0;
 			if (arp.operation == htons(ARPOP_REPLY) &&
-			    bcmp(arp.tHaddr, mac, 6) == 0 &&
+			    memcmp(arp.tHaddr, mac, 6) == 0 &&
 			    *((uint32_t *) arp.sInaddr) == yiaddr) {
 				DEBUG(LOG_INFO, "Valid arp reply receved for this address");
 				rv = 0;
