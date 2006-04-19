@@ -41,8 +41,8 @@
 #include <linux/if_ether.h>
 #endif
 
-#include "socket.h"
 #include "common.h"
+#include "socket.h"
 
 int read_interface(char *interface, int *ifindex, uint32_t *addr, uint8_t *arp)
 {

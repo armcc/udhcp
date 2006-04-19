@@ -26,8 +26,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "pidfile.h"
 #include "common.h"
+#include "pidfile.h"
 
 static char *saved_pidfile;
 

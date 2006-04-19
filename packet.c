@@ -14,10 +14,10 @@
 #endif
 #include <errno.h>
 
+#include "common.h"
 #include "packet.h"
 #include "dhcpd.h"
 #include "options.h"
-#include "common.h"
 
 
 void init_header(struct dhcpMessage *packet, char type)
