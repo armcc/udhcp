@@ -87,6 +87,7 @@ static void ATTRIBUTE_NORETURN show_usage(void)
 "                                  " DEFAULT_SCRIPT ")\n"
 "  -T, --timeout=seconds           Try to get the lease for the amount of\n"
 "                                  seconds (default: 3)\n"
+"  -t, --retries=NUM               Send up to NUM request packets\n"
 "  -v, --version                   Display version\n"
 	);
 	exit(0);
