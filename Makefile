@@ -51,7 +51,7 @@ ifdef SYSLOG
 CFLAGS += -DSYSLOG
 endif
 
-CFLAGS += -W -Wall -Wstrict-prototypes -DVERSION='"$(VER)"'
+CFLAGS += -W -Wall -Wstrict-prototypes -DVERSION='"$(VER)"' -D_GNU_SOURCE
 
 ifdef DEBUG
 CFLAGS += -g -DDEBUG
