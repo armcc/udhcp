@@ -2,6 +2,8 @@
 # Sample udhcpc bound script
 
 RESOLV_CONF="/etc/udhcpc/resolv.conf"
+TIMESRV_FILE="/var/tmp/tmsvr.conf"
+EXTOPT_FILE="/var/tmp/extopt.conf"
 
 [ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
 [ -n "$subnet" ] && NETMASK="netmask $subnet"
@@ -28,3 +30,97 @@ do
 	echo adding dns $i
 	echo nameserver $i >> $RESOLV_CONF
 done
+
+echo  > $TIMESRV_FILE 
+if [ -n "$timesvr" ]
+then
+        for i in $timesvr
+        do
+                echo timesvr $i >> $TIMESRV_FILE
+        done
+fi
+
+echo  > $EXTOPT_FILE 
+                                                                                                                                                             
+if [ -n "$nameserver" ]
+then
+        for i in $nameserver
+        do
+                echo nameserver $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$subnet" ]
+then
+        for i in $subnet
+        do
+                echo subnet $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$timesvr" ]
+then
+        for i in $timesvr
+        do
+                echo timesvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$namesvr" ]
+then
+        for i in $namesvr
+        do
+                echo namesvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$logsvr" ]
+then
+        for i in $logsvr
+        do
+                echo logsvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$cookiesvr" ]
+then
+        for i in $cookiesvr
+        do
+                echo cookiesvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$lprsvr" ]
+then
+        for i in $lprsvr
+        do
+                echo lprsvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$swapsvr" ]
+then
+        for i in $swapsvr
+        do
+                echo swapsvr $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$ntpsrv" ]
+then
+        for i in $ntpsrv
+        do
+                echo ntpsrv $i >> $EXTOPT_FILE
+        done
+fi
+
+if [ -n "$wins" ]
+then
+        for i in $wins
+        do
+                echo wins $i >> $EXTOPT_FILE
+        done
+fi
+
+[ -n "$domain" ] && echo domain $domain >> $EXTOPT_FILE
+

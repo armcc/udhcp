@@ -24,6 +24,7 @@ struct client_config_t {
 	unsigned char *hostname;	/* Optional hostname to use */
 	int ifindex;			/* Index number of the interface to use */
 	unsigned char arp[6];		/* Our arp address */
+	unsigned char defroute;		/* 0 => No Route; 1 => Install Route */
 };
 
 extern struct client_config_t client_config;

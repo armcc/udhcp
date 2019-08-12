@@ -158,7 +158,10 @@ static char **fill_envp(struct dhcpMessage *packet)
 	}
 	
 	envp = malloc((num_options + 5) * sizeof(char *));
-	envp[0] = malloc(sizeof("interface=") + strlen(client_config.interface));
+	if((envp[0] = malloc(sizeof("interface=") + strlen(client_config.interface))) == NULL) {
+        free(envp);
+        return NULL;
+    }
 	sprintf(envp[0], "interface=%s", client_config.interface);
 	envp[1] = find_env("PATH", "PATH=/bin:/usr/bin:/sbin:/usr/sbin");
 	envp[2] = find_env("HOME", "HOME=/");

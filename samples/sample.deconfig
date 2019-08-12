@@ -1,4 +1,10 @@
 #!/bin/sh
 # Sample udhcpc deconfig script
 
+TIMESRV_FILE="/var/tmp/tmsvr.conf"
+EXTOPT_FILE="/var/tmp/extopt.conf"
+
 /sbin/ifconfig $interface 0.0.0.0
+
+echo  > $TIMESRV_FILE
+echo  > $EXTOPT_FILE

@@ -21,6 +21,32 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+/*-------------------------------------------------------------------------------------
+// Copyright 2006, Texas Instruments Incorporated
+//
+// This program has been modified from its original operation by Texas Instruments
+// to do the following:
+//
+//	1. The server_config structure is extended to an array to define dhcp server 
+// configuration on a per interface basis. NSP supports multiple lan groups 
+// and requires dhcp server configuration per lan groups. These configurations 
+// are saved in the server_config array. udhcp server supports configuration for
+//  upto 6 interfaces.
+//  2. Modified the main() function accordingly to listen on upto 6 sockets. 
+// lease_file is therefore defined on a per interface basis. auto_time variable 
+// (timeout_end) is extended to an array to hold 6 entries. 
+//  3. read_interface() modified to add another arg for arp mac address
+//
+// THIS MODIFIED SOFTWARE AND DOCUMENTATION ARE PROVIDED
+// "AS IS," AND TEXAS INSTRUMENTS MAKES NO REPRESENTATIONS
+// OR WARRENTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO, WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
+// PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE OR
+// DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+// COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+//
+// These changes are covered as per original license.
+//-------------------------------------------------------------------------------------*/
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -91,7 +117,6 @@ int read_interface(char *interface, int *ifindex, uint32_t *addr, unsigned char 
 
 int listen_socket(unsigned int ip, int port, char *inf)
 {
-	struct ifreq interface;
 	int fd;
 	struct sockaddr_in addr;
 	int n = 1;
@@ -116,11 +141,12 @@ int listen_socket(unsigned int ip, int port, char *inf)
 		return -1;
 	}
 
-	strncpy(interface.ifr_ifrn.ifrn_name, inf, IFNAMSIZ);
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE,(char *)&interface, sizeof(interface)) < 0) {
-		close(fd);
-		return -1;
-	}
+    if(inf && strlen(inf) > 0) {
+	    if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE,inf, strlen(inf) + 1) < 0) {
+		    close(fd);
+		    return -1;
+	    }
+    }
 
 	if (bind(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr)) == -1) {
 		close(fd);

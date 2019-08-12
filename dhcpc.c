@@ -52,6 +52,9 @@ static unsigned long server_addr;
 static unsigned long timeout;
 static int packet_num; /* = 0 */
 static int fd;
+static int backup = 0;
+static int failurecnt = 0;
+static unsigned char backupip[16] = "0.0.0.0";
 
 #define LISTEN_NONE 0
 #define LISTEN_KERNEL 1
@@ -72,12 +75,14 @@ struct client_config_t client_config = {
 	hostname: NULL,
 	ifindex: 0,
 	arp: "\0\0\0\0\0\0",		/* appease gcc-3.0 */
+	defroute: 1,
 };
 
 static void print_usage(void)
 {
 	printf(
 "Usage: udhcpcd [OPTIONS]\n\n"
+"  -b, --backupip=IP               Use backup IP on failure\n"
 "  -c, --clientid=CLIENTID         Client identifier\n"
 "  -H, --hostname=HOSTNAME         Client hostname\n"
 "  -f, --foreground                Do not fork after getting lease\n"
@@ -90,6 +95,7 @@ static void print_usage(void)
 "  -s, --script=file               Run file at dhcp events (default:\n"
 "                                  " DEFAULT_SCRIPT ")\n"
 "  -v, --version                   Display version\n"
+"  -x, --noroute                   Do not install default route\n"
 	);
 }
 
@@ -109,18 +115,18 @@ static void change_mode(int new_mode)
 static void renew_requested(int sig)
 {
 	sig = 0;
-	LOG(LOG_INFO, "Received SIGUSR1");
-	if (state == BOUND || state == RENEWING || state == REBINDING ||
-	    state == RELEASED) {
+	if (state == BOUND || state == RENEWING || state == REBINDING)
+	{
 	    	change_mode(LISTEN_KERNEL);
 		packet_num = 0;
 		state = RENEW_REQUESTED;
 	}
-
-	if (state == RELEASED) {
+	else if (state == RELEASED) {
+		packet_num = 0;
 		change_mode(LISTEN_RAW);
 		state = INIT_SELECTING;
 	}
+	LOG(LOG_INFO, "Received SIGUSR1");
 
 	/* Kill any timeouts because the user wants this to hurry along */
 	timeout = 0;
@@ -131,12 +137,12 @@ static void renew_requested(int sig)
 static void release_requested(int sig)
 {
 	sig = 0;
-	LOG(LOG_INFO, "Received SIGUSR2");
 	/* send release packet */
 	if (state == BOUND || state == RENEWING || state == REBINDING) {
 		send_release(server_addr, requested_ip); /* unicast */
 		run_script(NULL, "deconfig");
 	}
+	LOG(LOG_INFO, "Received SIGUSR2");
 
 	change_mode(LISTEN_NONE);
 	state = RELEASED;
@@ -161,25 +167,6 @@ static void terminate(int sig)
 	exit_client(0);
 }
 
-
-static void background(void)
-{
-	int pid_fd;
-	if (client_config.quit_after_lease) {
-		exit_client(0);
-	} else if (!client_config.foreground) {
-		pid_fd = pidfile_acquire(client_config.pidfile); /* hold lock during fork. */
-		while (pid_fd >= 0 && pid_fd < 3) pid_fd = dup(pid_fd); /* don't let daemon close it */
-		if (daemon(0, 0) == -1) {
-			perror("fork");
-			exit_client(1);
-		}
-		client_config.foreground = 1; /* Do not fork again. */
-		pidfile_write_release(pid_fd);
-	}
-}
-
-
 #ifdef COMBINED_BINARY
 int udhcpc(int argc, char *argv[])
 #else
@@ -187,18 +174,20 @@ int main(int argc, char *argv[])
 #endif
 {
 	unsigned char *temp, *message;
-	unsigned long t1 = 0, t2 = 0, xid = 0;
-	unsigned long start = 0, lease;
+	unsigned long t1 = 0, t2 = 0, xid = 0, remaining_t1 = 0, remaining_t2 = 0;
+	unsigned long start = 0, lease = 0;
 	fd_set rfds;
 	int retval;
 	struct timeval tv;
 	int c, len;
 	struct dhcpMessage packet;
-	struct in_addr temp_addr;
+	struct in_addr temp_addr, temp_inet;
 	int pid_fd;
 	time_t now;
+	char calline[50];
 
 	static struct option options[] = {
+		{"backupip",	required_argument,		0, 'b'},
 		{"clientid",	required_argument,	0, 'c'},
 		{"foreground",	no_argument,		0, 'f'},
 		{"hostname",	required_argument,	0, 'H'},
@@ -210,16 +199,21 @@ int main(int argc, char *argv[])
 		{"request",	required_argument,	0, 'r'},
 		{"script",	required_argument,	0, 's'},
 		{"version",	no_argument,		0, 'v'},
+		{"noroute",	no_argument,		0, 'x'},    
 		{0, 0, 0, 0}
 	};
 
 	/* get options */
 	while (1) {
 		int option_index = 0;
-		c = getopt_long(argc, argv, "c:fH:hi:np:qr:s:v", options, &option_index);
+		c = getopt_long(argc, argv, "b:c:fH:hi:np:qr:s:vx", options, &option_index);
 		if (c == -1) break;
 		
 		switch (c) {
+		case 'b':
+			strcpy(backupip,optarg);
+			backup = 1;
+			break;
 		case 'c':
 			len = strlen(optarg) > 255 ? 255 : strlen(optarg);
 			if (client_config.clientid) free(client_config.clientid);
@@ -264,6 +258,8 @@ int main(int argc, char *argv[])
 		case 'v':
 			printf("udhcpcd, version %s\n\n", VERSION);
 			exit_client(0);
+		case 'x':
+			client_config.defroute = 0;
 			break;
 		}
 	}
@@ -333,13 +329,21 @@ int main(int argc, char *argv[])
 					timeout = now + ((packet_num == 2) ? 10 : 2);
 					packet_num++;
 				} else {
+					if((backup == 1) && (failurecnt >= 2)) {
+						sprintf(calline,"ifconfig %s %s",client_config.interface,backupip);
+						system(calline);
+						LOG(LOG_INFO, "Static-Lease of %s",backupip);
+						exit_client(1);
+					}
+					else
 					if (client_config.abort_if_no_lease) {
 						LOG(LOG_INFO, "No lease, failing.");
 						exit_client(1);
 				  	}
 					/* wait to try again */
+					failurecnt++;
 					packet_num = 0;
-					timeout = now + 60;
+					timeout = now + 5;
 				}
 				break;
 			case RENEW_REQUESTED:
@@ -377,8 +381,9 @@ int main(int argc, char *argv[])
 					/* send a request packet */
 					send_renew(xid, server_addr, requested_ip); /* unicast */
 					
+					remaining_t1 = (t2 - t1) / 2;
 					t1 = (t2 - t1) / 2 + t1;
-					timeout = t1 + start;
+					timeout = remaining_t1 + now;
 				}
 				break;
 			case REBINDING:
@@ -386,8 +391,8 @@ int main(int argc, char *argv[])
 				if ((lease - t2) <= (lease / 14400 + 1)) {
 					/* timed out, enter init state */
 					state = INIT_SELECTING;
-					LOG(LOG_INFO, "Lease lost, entering init state");
 					run_script(NULL, "deconfig");
+					LOG(LOG_INFO, "Lease lost, entering init state");
 					timeout = now;
 					packet_num = 0;
 					change_mode(LISTEN_RAW);
@@ -395,8 +400,9 @@ int main(int argc, char *argv[])
 					/* send a request packet */
 					send_renew(xid, 0, requested_ip); /* broadcast */
 
+					remaining_t2 = (lease - t2) / 2;
 					t2 = (lease - t2) / 2 + t2;
-					timeout = t2 + start;
+					timeout = remaining_t2 + now;
 				}
 				break;
 			case RELEASED:
@@ -465,24 +471,40 @@ int main(int argc, char *argv[])
 					/* little fixed point for n * .875 */
 					t2 = (lease * 0x7) >> 3;
 					temp_addr.s_addr = packet.yiaddr;
-					LOG(LOG_INFO, "Lease of %s obtained, lease time %ld", 
-						inet_ntoa(temp_addr), lease);
+
+					if (!(temp = get_option(&packet, DHCP_SUBNET)))
+						memset(&temp_inet.s_addr, 0x00, 4);
+					else
+						memcpy(&temp_inet.s_addr, temp, 4);
+
+					LOG(LOG_INFO, "Subnet mask %s obtained", inet_ntoa(temp_inet));
+					if ((temp = get_option(&packet,DHCP_ROUTER)))
+					{
+						memcpy(&temp_inet.s_addr,temp,4);
+						LOG(LOG_INFO, "Router %s obtained", inet_ntoa(temp_inet));
+					}
+
 					start = now;
 					timeout = t1 + start;
 					requested_ip = packet.yiaddr;
-					run_script(&packet,
-						   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
+					if(client_config.defroute == 1)
+						run_script(&packet,
+							   ((state == RENEWING || state == REBINDING) ? "renew" : "bound"));
+					else
+						run_script(&packet, "altbound");
 
+					LOG(LOG_INFO, "Lease of %s obtained, lease time %ld",
+						inet_ntoa(temp_addr), lease);
 					state = BOUND;
 					change_mode(LISTEN_NONE);
-					background();
+//					background();
 					
 				} else if (*message == DHCPNAK) {
 					/* return to init state */
-					LOG(LOG_INFO, "Received DHCP NAK");
 					run_script(&packet, "nak");
 					if (state != REQUESTING)
 						run_script(NULL, "deconfig");
+					LOG(LOG_INFO, "Received DHCP NAK");
 					state = INIT_SELECTING;
 					timeout = now;
 					requested_ip = 0;
