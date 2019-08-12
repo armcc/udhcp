@@ -32,7 +32,7 @@
  */  
 
 /* FIXME: match response against chaddr */
-int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *mac, char *interface)
+int arpping(uint32_t yiaddr, uint32_t ip, unsigned char *mac, char *interface)
 {
 
 	int	timeout = 2;
@@ -90,7 +90,7 @@ int arpping(u_int32_t yiaddr, u_int32_t ip, unsigned char *mac, char *interface)
 			if (recv(s, &arp, sizeof(arp), 0) < 0 ) rv = 0;
 			if (arp.operation == htons(ARPOP_REPLY) && 
 			    bcmp(arp.tHaddr, mac, 6) == 0 && 
-			    *((u_int *) arp.sInaddr) == yiaddr) {
+			    *((uint32_t *) arp.sInaddr) == yiaddr) {
 				DEBUG(LOG_INFO, "Valid arp reply receved for this address");
 				rv = 0;
 				break;

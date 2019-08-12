@@ -147,17 +147,17 @@ int add_option_string(unsigned char *optionptr, unsigned char *string)
 
 
 /* add a one to four byte option to a packet */
-int add_simple_option(unsigned char *optionptr, unsigned char code, u_int32_t data)
+int add_simple_option(unsigned char *optionptr, unsigned char code, uint32_t data)
 {
 	char length = 0;
 	int i;
 	unsigned char option[2 + 4];
 	unsigned char *u8;
-	u_int16_t *u16;
-	u_int32_t *u32;
-	u_int32_t aligned;
+	uint16_t *u16;
+	uint32_t *u32;
+	uint32_t aligned;
 	u8 = (unsigned char *) &aligned;
-	u16 = (u_int16_t *) &aligned;
+	u16 = (uint16_t *) &aligned;
 	u32 = &aligned;
 
 	for (i = 0; options[i].code; i++)

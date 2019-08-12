@@ -19,7 +19,7 @@
 unsigned char blank_chaddr[] = {[0 ... 15] = 0};
 
 /* clear every lease out that chaddr OR yiaddr matches and is nonzero */
-void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr)
+void clear_lease(uint8_t *chaddr, uint32_t yiaddr)
 {
 	unsigned int i, j;
 	
@@ -34,7 +34,7 @@ void clear_lease(u_int8_t *chaddr, u_int32_t yiaddr)
 
 
 /* add a lease into the table, clearing out any old ones */
-struct dhcpOfferedAddr *add_lease(u_int8_t *chaddr, u_int32_t yiaddr, unsigned long lease)
+struct dhcpOfferedAddr *add_lease(uint8_t *chaddr, uint32_t yiaddr, unsigned long lease)
 {
 	struct dhcpOfferedAddr *oldest;
 	
@@ -79,7 +79,7 @@ struct dhcpOfferedAddr *oldest_expired_lease(void)
 
 
 /* Find the first lease that matches chaddr, NULL if no match */
-struct dhcpOfferedAddr *find_lease_by_chaddr(u_int8_t *chaddr)
+struct dhcpOfferedAddr *find_lease_by_chaddr(uint8_t *chaddr)
 {
 	unsigned int i;
 
@@ -91,7 +91,7 @@ struct dhcpOfferedAddr *find_lease_by_chaddr(u_int8_t *chaddr)
 
 
 /* Find the first lease that matches yiaddr, NULL is no match */
-struct dhcpOfferedAddr *find_lease_by_yiaddr(u_int32_t yiaddr)
+struct dhcpOfferedAddr *find_lease_by_yiaddr(uint32_t yiaddr)
 {
 	unsigned int i;
 
@@ -104,9 +104,9 @@ struct dhcpOfferedAddr *find_lease_by_yiaddr(u_int32_t yiaddr)
 
 /* find an assignable address, it check_expired is true, we check all the expired leases as well.
  * Maybe this should try expired leases by age... */
-u_int32_t find_address(int check_expired) 
+uint32_t find_address(int check_expired) 
 {
-	u_int32_t addr, ret;
+	uint32_t addr, ret;
 	struct dhcpOfferedAddr *lease = NULL;		
 
 	addr = ntohl(server_config.start); /* addr is in host order here */
@@ -136,7 +136,7 @@ u_int32_t find_address(int check_expired)
 
 
 /* check is an IP is taken, if it is, add it to the lease table */
-int check_ip(u_int32_t addr)
+int check_ip(uint32_t addr)
 {
 	struct in_addr temp;
 	

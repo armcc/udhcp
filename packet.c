@@ -83,13 +83,13 @@ int get_packet(struct dhcpMessage *packet, int fd)
 }
 
 
-u_int16_t checksum(void *addr, int count)
+uint16_t checksum(void *addr, int count)
 {
 	/* Compute Internet Checksum for "count" bytes
 	 *         beginning at location "addr".
 	 */
 	register int32_t sum = 0;
-	u_int16_t *source = (u_int16_t *) addr;
+	uint16_t *source = (uint16_t *) addr;
 
 	while( count > 1 )  {
 		/*  This is the inner loop */
@@ -110,8 +110,8 @@ u_int16_t checksum(void *addr, int count)
 
 
 /* Constuct a ip/udp header for a packet, and specify the source and dest hardware address */
-int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port,
-		   u_int32_t dest_ip, int dest_port, unsigned char *dest_arp, int ifindex)
+int raw_packet(struct dhcpMessage *payload, uint32_t source_ip, int source_port,
+		   uint32_t dest_ip, int dest_port, unsigned char *dest_arp, int ifindex)
 {
 	int fd;
 	int result;
@@ -163,8 +163,8 @@ int raw_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port
 
 
 /* Let the kernel do all the work for packet generation */
-int kernel_packet(struct dhcpMessage *payload, u_int32_t source_ip, int source_port,
-		   u_int32_t dest_ip, int dest_port)
+int kernel_packet(struct dhcpMessage *payload, uint32_t source_ip, int source_port,
+		   uint32_t dest_ip, int dest_port)
 {
 	int n = 1;
 	int fd, result;

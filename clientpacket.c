@@ -168,8 +168,8 @@ int get_raw_packet(struct dhcpMessage *payload, int fd)
 {
 	int bytes;
 	struct udp_dhcp_packet packet;
-	u_int32_t source, dest;
-	u_int16_t check;
+	uint32_t source, dest;
+	uint16_t check;
 
 	memset(&packet, 0, sizeof(struct udp_dhcp_packet));
 	bytes = read(fd, &packet, sizeof(struct udp_dhcp_packet));

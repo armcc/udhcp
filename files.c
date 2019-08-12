@@ -47,7 +47,7 @@ static int read_str(char *line, void *arg)
 
 static int read_u32(char *line, void *arg)
 {
-	u_int32_t *dest = arg;
+	uint32_t *dest = arg;
 	char *endptr;
 	*dest = strtoul(line, &endptr, 0);
 	return endptr[0] == '\0';
@@ -77,8 +77,8 @@ static int read_opt(char *line, void *arg)
 	struct dhcp_option *option = NULL;
 	int retval = 0, length = 0;
 	char buffer[255];
-	u_int16_t result_u16;
-	u_int32_t result_u32;
+	uint16_t result_u16;
+	uint32_t result_u32;
 	int i;
 
 	if (!(opt = strtok(line, " \t="))) return 0;

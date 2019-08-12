@@ -67,9 +67,9 @@ static int sprintip(char *dest, char *pre, unsigned char *ip) {
 static void fill_options(char *dest, unsigned char *option, struct dhcp_option *type_p)
 {
 	int type, optlen;
-	u_int16_t val_u16;
+	uint16_t val_u16;
 	int16_t val_s16;
-	u_int32_t val_u32;
+	uint32_t val_u32;
 	int32_t val_s32;
 	int len = option[OPT_LEN - 2];
 

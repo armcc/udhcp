@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 	struct dhcpMessage packet;
 	unsigned char *state;
 	unsigned char *server_id, *requested;
-	u_int32_t server_id_align, requested_align;
+	uint32_t server_id_align, requested_align;
 	unsigned long timeout_end;
 	struct option_set *option;
 	struct dhcpOfferedAddr *lease;
