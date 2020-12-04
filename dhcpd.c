@@ -97,6 +97,10 @@ int no_of_ifaces = 0;
 int interfaces[MAX_INTERFACES] = {0,0,0,0,0,0};
 int flag43 = 0;
 
+char *vendor125_OptionInfo;
+char *vendor_option_file;
+int vendor_option_flag;
+
 #define LEASE_ADD	1
 #define LEASE_DEL	2
 

@@ -193,8 +193,4 @@ extern char *vendor125_OptionInfo;	/* option 125 from the vendor_option_file */
 extern char *vendor_option_file;	/* file that keeps option 125 received from DHCP Client */
 extern int vendor_option_flag;		/* indicates that the Vendor Specific information shall be updated */
 
-char *vendor125_OptionInfo;
-char *vendor_option_file;
-int vendor_option_flag;
-
 #endif
